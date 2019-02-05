@@ -1,6 +1,8 @@
 # DATX02-19-22
 Creating Bugs in Haskell
 
+## Getting working version of MuCheck
+
 Built with a fresh install of haskell-platform on an up-to-date version of Ubuntu 18.04 LTS:
 
 #### 1. Downloading and unpacking MuCheck from Hackage
@@ -31,7 +33,7 @@ Running `cabal install` now should download and install all dependencies, along 
 
 It should now be possible to import `MuCheck` modules and `haskell-src-exts` modules.<br>
 Example `Main.hs`:<br>
-```
+```haskell
 import Test.MuCheck
 import Language.Haskell.Exts
 
