@@ -61,7 +61,22 @@ handleModule :: (Module SrcSpanInfo) -> (Module SrcSpanInfo)
 handleModule (Module l h p i decls) = (Module l h p i (mutateBody decls))
 
 -- | This looks at a list of declarations in the file and does stuff
-mutateBody :: [Decl a] -> [Decl a]
-mutateBody original = original
+mutateBody :: [Decl l] -> [Decl l]
+mutateBody []     = []
+mutateBody (x:xs) = mutateDecl x : mutateBody xs
+
+mutateDecl :: Decl a -> Decl a
+mutateDecl decl = case decl of
+    TypeSig l names types -> TypeSig l (mutateNames names) types
+    otherwise -> decl
+
+mutateNames :: [Name l] -> [Name l]
+mutateNames []     = []
+mutateNames (n:ns) = mutateName n : mutateNames ns
+
+mutateName :: Name l -> Name l
+mutateName name = case name of
+    Ident l id  -> Ident l "subtract"
+    Symbol l id -> Symbol l "TESTSYMBOL"
 
 
