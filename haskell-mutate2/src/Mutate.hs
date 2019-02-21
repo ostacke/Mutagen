@@ -12,15 +12,14 @@ class Mutable a where
 -- Other suggestions for mutations in comments
 
 instance Mutable Bool where
-    mutate True = False
-    mutate False = True
+  mutate = not
 
 instance Mutable Char where
-    mutate c = succ c
+    mutate = succ
     -- mutate c = pred c
 
-instance Mutable (a, b) where
-    mutate (x, y) = (x, y)
+instance Mutable a => Mutable (a, b) where
+    mutate (x, y) = (mutate x, y)
     -- Recursive calls to mutate on x and y?
     -- How to behave with tuples of larger sizes?
     -- is there a way to "shuffle them around"?
@@ -41,20 +40,20 @@ instance Mutable Int where
     -- mutate x = x - 1
 
 instance Mutable Float where
-    mutate x = double2Float (float2Double x)
+    mutate = double2Float . float2Double
     -- mutate x = fromInteger (ceiling x)
     -- mutate x = fromInteger (truncate x)
     -- mutate x = fromInteger (round x)
 
 instance Mutable Double where
-    mutate x = float2Double (double2Float x)
+    mutate = float2Double . double2Float
     -- mutate x = fromInteger (ceiling x)
     -- mutate x = fromInteger (truncate x)
     -- mutate x = fromInteger (round x)
 
 instance Mutable [a] where
     mutate (x:xs) = xs
+    mutate _ = []
     -- mutate (x:xs) = x:(x:xs)
     -- mutate (x:xs) = x : reverse xs
 
-    
