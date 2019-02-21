@@ -3,6 +3,8 @@ module Main where
 import System.Environment
 import Language.Haskell.Exts
 
+import Mutate
+
 main :: IO ()
 main = do
     args <- getArgs
