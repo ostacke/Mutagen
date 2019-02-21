@@ -10,7 +10,6 @@ main = do
     args <- getArgs
 
     case args of
-        ("--print" : args')   -> printParseRes $ head args'
         ["--help"]            -> showUsage
         ["--version"]         -> putStrLn shortVersion
         _                     -> launch args
@@ -28,20 +27,6 @@ showUsage = do
     putStrLn "haskell-mutate2 version 0.1.0.0"
     putStrLn "Usage: haskell-mutate2 SOURCE"
 
-printParseRes :: String -> IO ()
-printParseRes path = do
-    res <- parseFile path
-    case res of
-        ParseOk (Module _ _ _ _ decls) -> dissectShow $ decls
-        otherwise -> putStrLn $ "Parsing failed."
-
-dissectShow :: [Decl a] -> IO ()
-dissectShow []     = print ""
-dissectShow (x:xs) = do
-    print "UNIMPLEMENTED"
-    dissectShow xs
-
-
 mutato :: String -> IO ()
 mutato path = do
     putStrLn $ ""
@@ -51,11 +36,28 @@ mutato path = do
 
     res <- parseFile path
     case res of
-        ParseOk m -> do 
-            putStrLn $ prettyPrint $ handleModule m
-            putStrLn $ ""
-            putStrLn $ "Parsing finished, mutation created."
+        ParseOk m -> do
+            let output = (prettyPrint $ handleModule m) ++ "\n"
+            printOutput output
+            saveOutput output path
         otherwise -> putStrLn $ "Parsing failed."
+
+printOutput :: String -> IO ()
+printOutput output = do
+    putStrLn $ "Parsing finished, mutation created:"
+    putStrLn $ ""
+    putStrLn $ output
+    putStrLn $ ""
+
+saveOutput :: String -> String -> IO ()
+saveOutput output path = do
+    putStrLn $ "Saving mutant to file..."
+    
+    let mutantPath = path ++ "-mutant.hs"
+    writeFile mutantPath output
+    
+    putStrLn $ "Mutant saved to: " ++ mutantPath
+    putStrLn $ ""
 
 -- | Thus far only looks at the declarations of the body, ignoring the 
 --   imports and other stuff, will probably mess the prettyPrint up later.
