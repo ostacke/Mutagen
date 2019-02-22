@@ -72,7 +72,31 @@ mutateBody (x:xs) = mutateDecl x : mutateBody xs
 mutateDecl :: Decl a -> Decl a
 mutateDecl decl = case decl of
     TypeSig l names types -> TypeSig l (mutateNames names) types
+    FunBind l matches -> FunBind l (mutateMatches matches)
     otherwise -> decl
+
+mutateMatches :: [Match l] -> [Match l]
+mutateMatches []     = []
+mutateMatches (x:xs) = case x of
+    Match l n ps rhs mb -> Match l n ps (mutateRhs rhs) mb : xs
+    _ -> undefined -- if InfixMatch
+
+mutateRhs :: Rhs l -> Rhs l
+mutateRhs rhs = case rhs of
+    UnGuardedRhs l exp -> UnGuardedRhs l (mutateExp exp)
+    _ -> undefined -- if GuardedRhs
+
+mutateExp :: Exp l -> Exp l
+mutateExp exp = case exp of
+    Lit l literal -> Lit l (mutateLiteral literal)
+    InfixApp l e1 qop e2 -> InfixApp l e1 qop (mutateExp e2)
+    _ -> exp
+
+mutateLiteral :: Literal l -> Literal l
+mutateLiteral lit = case lit of
+    Int l int str -> Int l mutatedInt (show mutatedInt)
+        where mutatedInt = mutate int
+    _ -> lit
 
 mutateNames :: [Name l] -> [Name l]
 mutateNames []     = []
@@ -80,7 +104,7 @@ mutateNames (n:ns) = mutateName n : mutateNames ns
 
 mutateName :: Name l -> Name l
 mutateName name = case name of
-    Ident l id  -> Ident l "subtract"
+    Ident l id  -> Ident l id
     Symbol l id -> Symbol l "TESTSYMBOL"
 
 
