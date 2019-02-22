@@ -3,6 +3,7 @@ module Mutate
 ) where
     
 import GHC.Float
+import Language.Haskell.Exts
 
 -- | Defining a class, "Mutable". The function mutate takes a member of the 
 -- class as an argument, and the result is of the same type. (?)
@@ -11,8 +12,14 @@ class Mutable a where
 
 -- Other suggestions for mutations in comments
 
+instance Mutable (Name a) where
+    mutate (Symbol l str) = case str of
+        "*" -> Symbol l "+"
+        _   -> Symbol l str
+    mutate x = x
+
 instance Mutable Bool where
-  mutate = not
+    mutate = not
 
 instance Mutable Char where
     mutate = succ
@@ -54,6 +61,6 @@ instance Mutable Double where
 instance Mutable [a] where
     mutate (x:xs) = xs
     mutate _ = []
-    -- mutate (x:xs) = x:(x:xs)
+    -- mutate (x:xs) = x : (x:xs)
     -- mutate (x:xs) = x : reverse xs
 
