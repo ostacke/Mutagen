@@ -89,8 +89,19 @@ mutateRhs rhs = case rhs of
 mutateExp :: Exp l -> Exp l
 mutateExp exp = case exp of
     Lit l literal -> Lit l (mutateLiteral literal)
-    InfixApp l e1 qop e2 -> InfixApp l e1 qop (mutateExp e2)
+    InfixApp l e1 qop e2 -> InfixApp l e1 (mutateQOp qop) (mutateExp e2)
     _ -> exp
+
+mutateQOp :: QOp l -> QOp l
+mutateQOp q = case q of
+    QVarOp l qn -> QVarOp l (mutateQName qn)
+    QConOp l qn -> QConOp l (mutateQName qn)
+
+mutateQName :: QName l -> QName l
+mutateQName n = case n of
+    Qual l m n -> Qual l m (mutate n)
+    UnQual l n -> UnQual l (mutate n)
+    _ -> n --SpecialCon
 
 mutateLiteral :: Literal l -> Literal l
 mutateLiteral lit = case lit of
@@ -100,7 +111,7 @@ mutateLiteral lit = case lit of
 
 mutateNames :: [Name l] -> [Name l]
 mutateNames []     = []
-mutateNames (n:ns) = mutateName n : mutateNames ns
+mutateNames (n:ns) = mutate n : mutateNames ns
 
 mutateName :: Name l -> Name l
 mutateName name = case name of
