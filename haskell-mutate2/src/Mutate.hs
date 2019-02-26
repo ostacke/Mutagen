@@ -1,6 +1,6 @@
 module Mutate
-( mutate
-) where
+    ( mutate
+    ) where
     
 import GHC.Float
 import Language.Haskell.Exts
@@ -13,15 +13,24 @@ class Mutable a where
 -- a -> [a] eller ngn annan struktur
 -- Other suggestions for mutations in comments
 
--- mutate3 som tar funktion/konstruktor med flera konstruerare,
+-- | Returns the list of mutants created by applying mutate on types
+--   with two type parameters (excluding location l)
+m2 :: (Mutable a, Mutable b) => (a -> b -> c) -> a -> b -> [c]
+m2 f a b = aMutants ++ bMutants
+    where aMutant = mutate a
+          bMutant = mutate b
+          aMutants = map (\x -> f x b) aMutant
+          bMutants = map (\x -> f a x) bMutant
+
+-- | Same as m2, but with three parameters
 m3 :: (Mutable a, Mutable b, Mutable c) => (a -> b -> c -> d) -> a -> b -> c -> [d]
-m3 f a b c = dsa ++ dsb ++ dsc
-    where as = mutate a
-          bs = mutate b
-          cs = mutate c
-          dsa = map (\x -> f x b c) as
-          dsb = map (\x -> f a x c) bs
-          dsc = map (\x -> f a b x) cs
+m3 f a b c = aMutants ++ bMutants ++ cMutants
+    where aMutant = mutate a
+          bMutant = mutate b
+          cMutant = mutate c
+          aMutants = map (\x -> f x b c) aMutant
+          bMutants = map (\x -> f a x c) bMutant
+          cMutants = map (\x -> f a b x) cMutant
 
 instance Mutable (Exp a) where
     mutate (InfixApp l e1 op e2) = m3 (InfixApp l) e1 op e2
