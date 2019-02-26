@@ -33,7 +33,8 @@ m3 f a b c = aMutants ++ bMutants ++ cMutants
           cMutants = map (\x -> f a b x) cMutant
 
 instance Mutable (Exp a) where
-    mutate (InfixApp l e1 op e2) = m3 (InfixApp l) e1 op e2
+    mutate (InfixApp l e1 op e2)        = m3 (InfixApp l) e1 op e2
+    mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
     mutate rest = [rest]
 
 instance Mutable (QOp a) where
