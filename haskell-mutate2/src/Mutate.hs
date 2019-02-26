@@ -23,58 +23,13 @@ m3 f a b c = dsa ++ dsb ++ dsc
           dsb = map (\x -> f a x c) bs
           dsc = map (\x -> f a b x) cs
 
-instance Mutable Exp a where
+instance Mutable (Exp a) where
     mutate (InfixApp l e1 op e2) = m3 (InfixApp l) e1 op e2
+    mutate rest = [rest]
 
-instance Mutable (Name a) where
-    mutate (Symbol l str) = case str of
-        "*" -> Symbol l "+"
-        _   -> Symbol l str
-    mutate x = x
+instance Mutable (QOp a) where
+    mutate rest = [rest]
 
-instance Mutable Bool where
-    mutate = not
-
-instance Mutable Char where
-    mutate = succ
-    -- mutate c = pred c
-
-instance Mutable a => Mutable (a, b) where
-    mutate (x, y) = (mutate x, y)
-    -- Recursive calls to mutate on x and y?
-    -- How to behave with tuples of larger sizes?
-    -- is there a way to "shuffle them around"?
-
-instance Mutable () where
-    mutate () = ()
-
-instance Mutable Integer where
-    mutate 0 = 1
-    mutate 1 = 0
-    mutate x = x + 1
-    -- mutate x = x - 1
-
-instance Mutable Int where
-    mutate 0 = 1
-    mutate 1 = 0
-    mutate x = x + 1
-    -- mutate x = x - 1
-
-instance Mutable Float where
-    mutate = double2Float . float2Double
-    -- mutate x = fromInteger (ceiling x)
-    -- mutate x = fromInteger (truncate x)
-    -- mutate x = fromInteger (round x)
-
-instance Mutable Double where
-    mutate = float2Double . double2Float
-    -- mutate x = fromInteger (ceiling x)
-    -- mutate x = fromInteger (truncate x)
-    -- mutate x = fromInteger (round x)
-
-instance Mutable [a] where
-    mutate (x:xs) = xs
-    mutate _ = []
-    -- mutate (x:xs) = x : (x:xs)
-    -- mutate (x:xs) = x : reverse xs
+instance (Mutable a) => Mutable [a] where
+    mutate xs = map mutate xs 
 
