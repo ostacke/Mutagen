@@ -5,13 +5,16 @@ module Mutate
 import GHC.Float
 import Language.Haskell.Exts
 
--- | Defining a class, "Mutable". The function mutate takes a member of the 
+-- | Defining a class Mutable. The function mutate takes a member of the 
 -- class as an argument, and the result is of the same type. (?)
 class Mutable a where
     mutate :: a -> [a]
 
--- a -> [a] eller ngn annan struktur
--- Other suggestions for mutations in comments
+-- 
+m1 :: (Mutable a) => (a -> b) -> a -> [b]
+m1 f a = aMutants
+    where aMutant = mutate a
+          aMutants = map (\x -> f x) aMutant
 
 -- | Returns the list of mutants created by applying mutate on types
 --   with two type parameters (excluding location l)
@@ -32,6 +35,65 @@ m3 f a b c = aMutants ++ bMutants ++ cMutants
           bMutants = map (\x -> f a x c) bMutant
           cMutants = map (\x -> f a b x) cMutant
 
+-- | Same as m2, but with four parameters
+m4 :: (Mutable a, Mutable b, Mutable c, Mutable d) => 
+    (a -> b -> c -> d -> e) -> a -> b -> c -> d -> [e]
+m4 f a b c d = aMutants ++ bMutants ++ cMutants ++ dMutants
+    where aMutant = mutate a
+          bMutant = mutate b
+          cMutant = mutate c
+          dMutant = mutate d
+          aMutants = map (\x -> f x b c d) aMutant
+          bMutants = map (\x -> f a x c d) bMutant
+          cMutants = map (\x -> f a b x d) cMutant
+          dMutants = map (\x -> f a b c x) dMutant
+
+-- | Same as m2, buth with five parameters
+m5 :: (Mutable a, Mutable b, Mutable c, Mutable d, Mutable e) => 
+    (a -> b -> c -> d -> e -> f) -> a -> b -> c -> d -> e -> [f]
+m5 f a b c d e = aMutants ++ bMutants ++ cMutants ++ dMutants ++ eMutants
+    where aMutant = mutate a
+          bMutant = mutate b
+          cMutant = mutate c
+          dMutant = mutate d
+          eMutant = mutate e
+          aMutants = map (\x -> f x b c d e) aMutant
+          bMutants = map (\x -> f a x c d e) bMutant
+          cMutants = map (\x -> f a b x d e) cMutant
+          dMutants = map (\x -> f a b c x e) dMutant
+          eMutants = map (\x -> f a b c d x) eMutant
+
+instance Mutable (Module a) where
+    mutate (Module l mbyHead pragmas importDecls decls) =
+        m4 (Module l) mbyHead pragmas importDecls decls 
+
+instance Mutable (ModuleHead a) where
+    mutate rest = [rest]
+
+instance Mutable (ModulePragma a) where
+    mutate rest = [rest]
+
+instance Mutable (ImportDecl a) where
+    mutate rest = [rest]
+
+instance Mutable (Decl a) where
+    mutate decl = case decl of
+        FunBind l matches -> m1 (FunBind l) matches
+        
+        _ -> [decl]
+
+instance Mutable (Match a) where
+    mutate match = case match of
+        _ -> [match]
+
+instance Mutable (Name a) where
+    mutate name = case name of
+        _ -> [name]
+
+instance Mutable (Pat a) where
+    mutate pat = case pat of
+        _ -> [pat]
+
 instance Mutable (Exp a) where
     mutate (InfixApp l e1 op e2)        = m3 (InfixApp l) e1 op e2
     mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
@@ -40,6 +102,8 @@ instance Mutable (Exp a) where
 instance Mutable (QOp a) where
     mutate rest = [rest]
 
+instance Mutable (Maybe a) where
+    mutate rest = [rest]
+
 instance (Mutable a) => Mutable [a] where
     mutate xs = map mutate xs 
-
