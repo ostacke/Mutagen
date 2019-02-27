@@ -1,4 +1,5 @@
 .stack-work/
 haskell-mutate2.cabal
 *~
-*-mutant.hs
+*-mutant
+out
