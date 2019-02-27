@@ -3,6 +3,8 @@ module Main where
 import System.Environment
 import System.Directory
 
+import Text.Pretty.Simple
+
 import Language.Haskell.Exts
 
 import Mutate
@@ -44,6 +46,8 @@ mutateOnPath path = do
         ParseOk ast -> do
             putStrLn $ "Parsing successful, creating mutants..."
             let mutantTrees = mutate ast
+
+            pPrintNoColor mutantTrees
             
             putStrLn $ "Mutants created, writing to output files..."
             writeMutants path mutantTrees

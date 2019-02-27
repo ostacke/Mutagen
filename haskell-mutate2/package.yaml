@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - haskell-src-exts
 - directory
+- pretty-simple
 
 library:
   source-dirs: src

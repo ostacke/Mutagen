@@ -82,12 +82,22 @@ instance Mutable (Decl a) where
         
         _ -> [decl]
 
+instance Mutable (Rhs a) where
+    mutate rhs = case rhs of
+        UnGuardedRhs l exp -> m1 (UnGuardedRhs l) exp
+
+        _ -> [rhs]
+
 instance Mutable (Match a) where
     mutate match = case match of
+        InfixMatch l pat name pats rhs mbyBinds ->
+            m5 (InfixMatch l) pat name pats rhs mbyBinds
         _ -> [match]
 
 instance Mutable (Name a) where
     mutate name = case name of
+        Symbol l s -> [(Symbol l "-"), (Symbol l "+")]
+
         _ -> [name]
 
 instance Mutable (Pat a) where
@@ -95,15 +105,20 @@ instance Mutable (Pat a) where
         _ -> [pat]
 
 instance Mutable (Exp a) where
-    mutate (InfixApp l e1 op e2)        = m3 (InfixApp l) e1 op e2
+    mutate (InfixApp l e1 qOp e2)       = m3 (InfixApp l) e1 qOp e2
     mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
     mutate rest = [rest]
 
 instance Mutable (QOp a) where
+    mutate (QVarOp l qName) = m1 (QVarOp l) qName
+    mutate rest             = [rest]
+
+instance Mutable (QName a) where
+    mutate (UnQual l name) = m1 (UnQual l) name
     mutate rest = [rest]
 
 instance Mutable (Maybe a) where
     mutate rest = [rest]
 
 instance (Mutable a) => Mutable [a] where
-    mutate xs = map mutate xs 
+    mutate xs = map mutate xs
