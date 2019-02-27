@@ -1,6 +1,8 @@
 module Main where
 
 import System.Environment
+import System.Directory
+
 import Language.Haskell.Exts
 
 import Mutate
@@ -10,37 +12,57 @@ main = do
     args <- getArgs
 
     case args of
-        ["--help"]            -> showUsage
-        ["--version"]         -> putStrLn shortVersion
-        _                     -> launch args
+        "--help"    : xs    -> showUsage
+        "--version" : xs    -> putStrLn version
+        _                   -> launch args
 
-launch args = do
-    if length args == 0
-        then showUsage
-        else mutato (head args)
-
-shortVersion :: String
-shortVersion = "haskell-mutate2 version 0.1.0.0"
+version :: String
+version = "haskell-mutate2 version 0.1.0.0"
 
 showUsage :: IO ()
 showUsage = do
     putStrLn "haskell-mutate2 version 0.1.0.0"
     putStrLn "Usage: haskell-mutate2 SOURCE"
 
-mutato :: String -> IO ()
-mutato path = do
-    putStrLn $ ""
-    putStrLn $ "haskell-mutate2 version 0.1.0.0"
-    putStrLn $ "Attempting to parse and mutate file..."
-    putStrLn $ "" 
+launch :: [String] -> IO ()
+launch args = case length args of
+    0 -> showUsage
+    1 -> do
+        putStrLn $ ""
+        putStrLn $ "haskell-mutate2 version 0.1.0.0"
+        putStrLn $ "Attempting to parse and mutate file..."
+        putStrLn $ "" 
 
+        -- mutateOnPath (head args) -- instance of Mutable not finished yet
+
+    _ -> showUsage
+
+mutateOnPath :: String -> IO ()
+mutateOnPath path = do
     res <- parseFile path
     case res of
-        ParseOk m -> do
-            let output = (prettyPrint $ handleModule m) ++ "\n"
-            printOutput output
-            saveOutput output path
-        otherwise -> putStrLn $ "Parsing failed."
+        ParseOk ast -> do
+            putStrLn $ "Parsing successful, creating mutants..."
+            let mutantTrees = mutate ast
+            
+            putStrLn $ "Mutants created, writing to output files..."
+            writeMutants path mutantTrees
+
+            putStrLn $ "Finished writing mutants to files."
+            putStrLn $ "Total mutants created: " ++ show (length mutantTrees)
+
+        ParseFailed l errMsg -> do
+            putStrLn $ "Parsing failed:"
+            putStrLn $ ""
+            putStrLn $ errMsg
+
+writeMutants :: String -> [Module l] -> IO ()
+writeMutants _ []        = return ()
+writeMutants path (x:xs) = do
+    let outputDir = "out"
+    createDirectoryIfMissing True outputDir
+    let mutantPath = path ++ "-mutant-" ++ show (length xs - 1) ++ ".hs"
+    withCurrentDirectory outputDir $ writeFile (prettyPrint x) mutantPath
 
 printOutput :: String -> IO ()
 printOutput output = do
