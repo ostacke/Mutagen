@@ -33,7 +33,7 @@ launch args = case length args of
         putStrLn $ "Attempting to parse and mutate file..."
         putStrLn $ "" 
 
-        -- mutateOnPath (head args) -- instance of Mutable not finished yet
+        mutateOnPath (head args)
 
     _ -> showUsage
 
@@ -49,7 +49,6 @@ mutateOnPath path = do
             writeMutants path mutantTrees
 
             putStrLn $ "Finished writing mutants to files."
-            putStrLn $ "Total mutants created: " ++ show (length mutantTrees)
 
         ParseFailed l errMsg -> do
             putStrLn $ "Parsing failed:"
@@ -61,8 +60,11 @@ writeMutants _ []        = return ()
 writeMutants path (x:xs) = do
     let outputDir = "out"
     createDirectoryIfMissing True outputDir
-    let mutantPath = path ++ "-mutant-" ++ show (length xs - 1) ++ ".hs"
-    withCurrentDirectory outputDir $ writeFile (prettyPrint x) mutantPath
+    
+    let mutantPath = path ++ "-mutant-" ++ show (length xs) ++ ".hs"
+    withCurrentDirectory outputDir $ writeFile mutantPath (prettyPrint x)
+    
+    writeMutants path xs
 
 printOutput :: String -> IO ()
 printOutput output = do
