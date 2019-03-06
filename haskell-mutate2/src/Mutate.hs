@@ -5,6 +5,7 @@ module Mutate
 import GHC.Float
 import Language.Haskell.Exts
 import Debug.Trace
+import Data.List
 
 -- | Defining a class Mutable. The function mutate takes a member of the 
 -- class as an argument, and the result is of the same type. (?)
@@ -48,7 +49,10 @@ m4 f a b c d = aMutants ++ bMutants ++ cMutants ++ dMutants
           aMutants = map (\x -> f x b c d) aMutant
           bMutants = map (\x -> f a x c d) bMutant
           cMutants = map (\x -> f a b x d) cMutant
-          dMutants = map (\x -> f a b c x) dMutant
+          dMutants = map (\x -> f a b c x) (combine d dMutant)
+
+combine :: (Mutable a) => a -> [a] -> [a]
+combine d dmut = intersperse d dmut 
 
 
 -- TODO: IMPLEMENT THIS IN A SMARTER WAY
