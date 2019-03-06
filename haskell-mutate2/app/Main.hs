@@ -70,13 +70,13 @@ writeMutants path (x:xs) = do
     let mutantPath = path ++ "-mutant-" ++ show (length xs) ++ ".hs"
 
     {- FOR DEBUGGING -}
-    {-
+
     putStrLn $ ""
     putStrLn $ ":: Path of mutant: " ++ mutantPath
     putStrLn $ ":: Prettyprint of mutant: "
     putStrLn $ ""
     putStrLn $ prettyPrint x
-    -}
-    withCurrentDirectory outputDir $ writeFile mutantPath (prettyPrint x)
+
+    -- withCurrentDirectory outputDir $ writeFile mutantPath (prettyPrint x)
 
     writeMutants path xs

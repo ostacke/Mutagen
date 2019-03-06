@@ -41,14 +41,43 @@ m3 f a b c = aMutants ++ bMutants ++ cMutants
 m4 :: (Mutable a, Mutable b, Mutable c, Mutable d) =>
     (a -> b -> c -> d -> e) -> a -> b -> c -> d -> [e]
 m4 f a b c d = aMutants ++ bMutants ++ cMutants ++ dMutants
-    where aMutant = mutate a
-          bMutant = mutate b
-          cMutant = mutate c
-          dMutant = mutate d
+    where aMutant = mutate a -- [Nothing]
+          bMutant = mutate b -- []
+          cMutant = mutate c -- []
+          dMutant = mutate d -- [[FunBind1], [FunBind2]]
           aMutants = map (\x -> f x b c d) aMutant
           bMutants = map (\x -> f a x c d) bMutant
           cMutants = map (\x -> f a b x d) cMutant
           dMutants = map (\x -> f a b c x) dMutant
+
+combine :: (Mutable a) => [a] -> [[a]] -> [[a]]
+combine normalDecls mutantsDelcs = undefined
+
+-- insertOneMutant :: (Mutable)
+
+
+
+-- Run some function on the lists (aMutant, bMutant etc.) to create all
+-- combinations possible from the lists
+
+-- In other words, if we have dMutant as [mutants1, mutants2], we want a
+-- list of "The first of mutants1" and every element in mutants 2 (so,
+-- lenght of mutants2 long list). then the same for element 2 in mutants1, then
+-- 3 and so on. For [mutants1, mutants2], we get a list of
+-- (length mutants1 * length mutants2) length.
+
+
+
+-- d == [TypeSig n t, FunBind m]
+-- aMutants == Module l Nothing [] [] [TypeSig n t, FunBind ms]
+
+-- bMutants == []
+-- cMutants == []
+
+-- dMutants == Module l Nothing [] [] [TypeSig n t]
+-- dMutants == Module l Nothing [] [] [FunBind ms]
+
+
 
 -- | Same as m2, buth with five parameters
 m5 :: (Mutable a, Mutable b, Mutable c, Mutable d, Mutable e) =>
@@ -67,7 +96,8 @@ m5 f a b c d e = aMutants ++ bMutants ++ cMutants ++ dMutants ++ eMutants
 
 instance (Show a) => Mutable (Module a) where
     mutate (Module l mbyHead pragmas importDecls decls) =
-        trace ("MUTATED M4: \n" ++ unlines (map prettyPrint (m4 (Module l) mbyHead pragmas importDecls decls))) $ m4 (Module l) mbyHead pragmas importDecls decls
+        trace ("DECLARATIONS: " ++ show (length (mutate decls))) $ m4 (Module l) mbyHead pragmas importDecls decls
+      --trace ("MUTATED M4: \n" ++ unlines (map prettyPrint (m4 (Module l) mbyHead pragmas importDecls decls))) $ m4 (Module l) mbyHead pragmas importDecls decls
 
 instance Mutable (ModuleHead a) where
     mutate rest = [rest]
@@ -80,7 +110,7 @@ instance Mutable (ImportDecl a) where
 
 instance Mutable (Decl a) where
     mutate decl = case decl of
-        FunBind l matches -> m1 (FunBind l) matches
+        -- FunBind l matches -> m1 (FunBind l) matches
 
         _ -> [decl]
 
