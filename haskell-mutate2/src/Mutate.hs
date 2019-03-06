@@ -50,10 +50,21 @@ m4 f a b c d = aMutants ++ bMutants ++ cMutants ++ dMutants
           cMutants = map (\x -> f a b x d) cMutant
           dMutants = map (\x -> f a b c x) dMutant
 
-combine :: (Mutable a) => [a] -> [[a]] -> [[a]]
-combine normalDecls mutantsDelcs = undefined
 
--- insertOneMutant :: (Mutable)
+-- TODO: IMPLEMENT THIS IN A SMARTER WAY
+combine :: (Mutable a) => [a] -> [[a]] -> [[a]]
+combine normals mutants = concatMap (insertMutants (length mutants) normals) mutants
+
+-- TODO: Implement in a smarter way
+-- | Takes a list of "normal" elements and a list of mutant elements
+--   and creates the list of each mutant element replacing one element
+--   in the "normal" list.
+insertMutants :: Int -> [a] -> [a] -> [[a]]
+insertMutants i normals mutants =
+    replaceAt i normals (mutants !! 0) : insertMutants (i - 1) normals mutants
+
+replaceAt :: Int -> [a] -> a -> [a]
+replaceAt n xs r = take n xs ++ [r] ++ drop (n + 1) xs
 
 
 
