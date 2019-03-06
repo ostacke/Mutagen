@@ -33,7 +33,7 @@ launch args = case length args of
         putStrLn $ ""
         putStrLn $ "haskell-mutate2 version 0.1.0.0"
         putStrLn $ "Attempting to parse and mutate file..."
-        putStrLn $ "" 
+        putStrLn $ ""
 
         mutateOnPath (head args)
 
@@ -47,8 +47,9 @@ mutateOnPath path = do
             putStrLn $ "Parsing successful, creating mutants..."
             let mutantTrees = mutate ast
 
-            pPrintNoColor mutantTrees
-            
+            -- FOR DEBUGGING
+            -- pPrintNoColor mutantTrees
+
             putStrLn $ "Mutants created, writing to output files..."
             writeMutants path mutantTrees
 
@@ -64,8 +65,18 @@ writeMutants _ []        = return ()
 writeMutants path (x:xs) = do
     let outputDir = "out"
     createDirectoryIfMissing True outputDir
-    
+
+
     let mutantPath = path ++ "-mutant-" ++ show (length xs) ++ ".hs"
+
+    {- FOR DEBUGGING -}
+    {-
+    putStrLn $ ""
+    putStrLn $ ":: Path of mutant: " ++ mutantPath
+    putStrLn $ ":: Prettyprint of mutant: "
+    putStrLn $ ""
+    putStrLn $ prettyPrint x
+    -}
     withCurrentDirectory outputDir $ writeFile mutantPath (prettyPrint x)
-    
+
     writeMutants path xs
