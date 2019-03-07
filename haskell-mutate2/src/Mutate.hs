@@ -4,15 +4,13 @@ module Mutate
 
 import GHC.Float
 import Language.Haskell.Exts
-import Debug.Trace
 import Data.List
 
 -- | Defining a class Mutable. The function mutate takes a member of the 
--- class as an argument, and the result is of the same type. (?)
+--   class as an argument, and the result is of the same type. (?)
 class Mutable a where
     mutate :: a -> [a]
 
---
 m1 :: (Mutable a) => (a -> b) -> a -> [b]
 m1 f a = aMutants
     where aMutant = mutate a
@@ -42,57 +40,14 @@ m3 f a b c = aMutants ++ bMutants ++ cMutants
 m4 :: (Mutable a, Mutable b, Mutable c, Mutable d) =>
     (a -> b -> c -> d -> e) -> a -> b -> c -> d -> [e]
 m4 f a b c d = aMutants ++ bMutants ++ cMutants ++ dMutants
-    where aMutant = mutate a -- [Nothing]
-          bMutant = mutate b -- []
-          cMutant = mutate c -- []
-          dMutant = mutate d -- [[FunBind1], [FunBind2]]
+    where aMutant = mutate a
+          bMutant = mutate b
+          cMutant = mutate c
+          dMutant = mutate d
           aMutants = map (\x -> f x b c d) aMutant
           bMutants = map (\x -> f a x c d) bMutant
           cMutants = map (\x -> f a b x d) cMutant
           dMutants = map (\x -> f a b c x) dMutant
-
-combine :: (Mutable a) => a -> [a] -> [a]
-combine d dmut = intersperse d dmut 
-
-
--- TODO: IMPLEMENT THIS IN A SMARTER WAY
--- combine :: (Mutable a) => [a] -> [[a]] -> [[a]]
--- combine normals mutants = concatMap (insertMutants (length mutants) normals) mutants
-
--- TODO: Implement in a smarter way
--- | Takes a list of "normal" elements and a list of mutant elements
---   and creates the list of each mutant element replacing one element
---   in the "normal" list.
-insertMutants :: Int -> [a] -> [a] -> [[a]]
-insertMutants i normals mutants =
-    replaceAt i normals (mutants !! 0) : insertMutants (i - 1) normals mutants
-
-replaceAt :: Int -> [a] -> a -> [a]
-replaceAt n xs r = take n xs ++ [r] ++ drop (n + 1) xs
-
-
-
--- Run some function on the lists (aMutant, bMutant etc.) to create all
--- combinations possible from the lists
-
--- In other words, if we have dMutant as [mutants1, mutants2], we want a
--- list of "The first of mutants1" and every element in mutants 2 (so,
--- lenght of mutants2 long list). then the same for element 2 in mutants1, then
--- 3 and so on. For [mutants1, mutants2], we get a list of
--- (length mutants1 * length mutants2) length.
-
-
-
--- d == [TypeSig n t, FunBind m]
--- aMutants == Module l Nothing [] [] [TypeSig n t, FunBind ms]
-
--- bMutants == []
--- cMutants == []
-
--- dMutants == Module l Nothing [] [] [TypeSig n t]
--- dMutants == Module l Nothing [] [] [FunBind ms]
-
-
 
 -- | Same as m2, buth with five parameters
 m5 :: (Mutable a, Mutable b, Mutable c, Mutable d, Mutable e) =>
@@ -124,7 +79,8 @@ instance Mutable (ImportDecl a) where
 
 instance Mutable (Decl a) where
     mutate decl = case decl of
-        -- FunBind l matches -> m1 (FunBind l) matches
+        PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
+
         _ -> []
 
 instance Mutable (Rhs a) where
@@ -135,8 +91,7 @@ instance Mutable (Rhs a) where
 
 instance Mutable (Match a) where
     mutate match = case match of
-        Match l name pat rhs mbyBinds ->
-            m4 (Match l) name pat rhs mbyBinds
+        Match l name pat rhs mbyBinds -> m4 (Match l) name pat rhs mbyBinds
         _ -> []
 
 instance Mutable (Name a) where
@@ -152,6 +107,7 @@ instance Mutable (Pat a) where
 instance Mutable (Exp a) where
     mutate (InfixApp l e1 qOp e2)       = m3 (InfixApp l) e1 qOp e2
     mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
+    mutate (Lit l literal)              = m1 (Lit l) literal
     mutate rest = []
 
 instance Mutable (QOp a) where
@@ -162,6 +118,9 @@ instance Mutable (QName a) where
     mutate (UnQual l name) = m1 (UnQual l) name
     mutate rest = []
 
+instance Mutable (Literal a) where
+    mutate (Int l int str) = map (\x -> Int l x (show x)) [int + 1, int - 1]
+
 instance Mutable (Maybe a) where
     mutate rest = []
 
@@ -169,33 +128,3 @@ instance (Mutable a) => Mutable [a] where
     mutate []     = []
     mutate (x:xs) = m2 (:) x xs
 
--- 2 buggar: Ge standardfallet då ej går att mtuera
---           Fixa hur den arbetar på listor
---
--- g;r case distinction f;r  fall med (x : xs) och []
--- use m2 for lists
--- use filter och just throw away unusable mutants.
--- [] = []
--- beware of Either a b (g[r inte att skapa b(
--- liknande med Maybe, vi kan mutera eller ge Nothing, men g[r ej att 
--- skapa en Just
---
--- genesis f[r nog vara r'tt liten, ej rekursiv
--- eller take 3
--- eller gen typ (arbitrary i QC)
---
--- om vi vill slumpa v'rden finns det bibliotek f;r det
---
--- 1 Generera mutanter
---
--- Literals: mutera t.ex. integer literals
--- 2'
---
--- första steg:
--- om vi muterar 1 + 1: gör ingenting
---
--- sen:
--- fixa mutate x för Int så att mutate x = [x+1, x-1]
---
---
---
