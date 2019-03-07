@@ -15,7 +15,7 @@ class Mutable a where
 --
 m1 :: (Mutable a) => (a -> b) -> a -> [b]
 m1 f a = aMutants
-    where aMutant = trace ("MUTATING M1: ") $ mutate a
+    where aMutant = mutate a
           aMutants = map (\x -> f x) aMutant
 
 -- | Returns the list of mutants created by applying mutate on types
@@ -32,7 +32,7 @@ m3 :: (Mutable a, Mutable b, Mutable c) =>
     (a -> b -> c -> d) -> a -> b -> c -> [d]
 m3 f a b c = aMutants ++ bMutants ++ cMutants
     where aMutant = mutate a
-          bMutant = trace "THIS IS THE B MUTANT" (mutate b)
+          bMutant = mutate b
           cMutant = mutate c
           aMutants = map (\x -> f x b c) aMutant
           bMutants = map (\x -> f a x c) bMutant
@@ -49,15 +49,15 @@ m4 f a b c d = aMutants ++ bMutants ++ cMutants ++ dMutants
           aMutants = map (\x -> f x b c d) aMutant
           bMutants = map (\x -> f a x c d) bMutant
           cMutants = map (\x -> f a b x d) cMutant
-          dMutants = map (\x -> f a b c x) (combine d dMutant)
+          dMutants = map (\x -> f a b c x) dMutant
 
 combine :: (Mutable a) => a -> [a] -> [a]
 combine d dmut = intersperse d dmut 
 
 
 -- TODO: IMPLEMENT THIS IN A SMARTER WAY
-combine :: (Mutable a) => [a] -> [[a]] -> [[a]]
-combine normals mutants = concatMap (insertMutants (length mutants) normals) mutants
+-- combine :: (Mutable a) => [a] -> [[a]] -> [[a]]
+-- combine normals mutants = concatMap (insertMutants (length mutants) normals) mutants
 
 -- TODO: Implement in a smarter way
 -- | Takes a list of "normal" elements and a list of mutant elements
@@ -111,61 +111,91 @@ m5 f a b c d e = aMutants ++ bMutants ++ cMutants ++ dMutants ++ eMutants
 
 instance (Show a) => Mutable (Module a) where
     mutate (Module l mbyHead pragmas importDecls decls) =
-        trace ("DECLARATIONS: " ++ show (length (mutate decls))) $ m4 (Module l) mbyHead pragmas importDecls decls
-      --trace ("MUTATED M4: \n" ++ unlines (map prettyPrint (m4 (Module l) mbyHead pragmas importDecls decls))) $ m4 (Module l) mbyHead pragmas importDecls decls
+        m4 (Module l) mbyHead pragmas importDecls decls
 
 instance Mutable (ModuleHead a) where
-    mutate rest = [rest]
+    mutate rest = []
 
 instance Mutable (ModulePragma a) where
-    mutate rest = [rest]
+    mutate rest = []
 
 instance Mutable (ImportDecl a) where
-    mutate rest = [rest]
+  mutate rest = []
 
 instance Mutable (Decl a) where
     mutate decl = case decl of
         -- FunBind l matches -> m1 (FunBind l) matches
-
-        _ -> [decl]
+        _ -> []
 
 instance Mutable (Rhs a) where
     mutate rhs = case rhs of
         UnGuardedRhs l exp -> m1 (UnGuardedRhs l) exp
 
-        _ -> [rhs]
+        _ -> []
 
 instance Mutable (Match a) where
     mutate match = case match of
         Match l name pat rhs mbyBinds ->
             m4 (Match l) name pat rhs mbyBinds
-        _ -> [match]
+        _ -> []
 
 instance Mutable (Name a) where
     mutate name = case name of
         Symbol l s -> [(Symbol l "-")]
 
-        _ -> [name]
+        _ -> []
 
 instance Mutable (Pat a) where
     mutate pat = case pat of
-        _ -> [pat]
+        _ -> []
 
 instance Mutable (Exp a) where
-    mutate (InfixApp l e1 qOp e2)       = trace "INFIXAPP" $ m3 (InfixApp l) e1 qOp e2
+    mutate (InfixApp l e1 qOp e2)       = m3 (InfixApp l) e1 qOp e2
     mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
-    mutate rest = [rest]
+    mutate rest = []
 
 instance Mutable (QOp a) where
     mutate (QVarOp l qName) = m1 (QVarOp l) qName
-    mutate rest             = [rest]
+    mutate rest             = []
 
 instance Mutable (QName a) where
     mutate (UnQual l name) = m1 (UnQual l) name
-    mutate rest = [rest]
+    mutate rest = []
 
 instance Mutable (Maybe a) where
-    mutate rest = [rest]
+    mutate rest = []
 
 instance (Mutable a) => Mutable [a] where
-    mutate xs = map mutate xs
+    mutate []     = []
+    mutate (x:xs) = m2 (:) x xs
+
+-- 2 buggar: Ge standardfallet då ej går att mtuera
+--           Fixa hur den arbetar på listor
+--
+-- g;r case distinction f;r  fall med (x : xs) och []
+-- use m2 for lists
+-- use filter och just throw away unusable mutants.
+-- [] = []
+-- beware of Either a b (g[r inte att skapa b(
+-- liknande med Maybe, vi kan mutera eller ge Nothing, men g[r ej att 
+-- skapa en Just
+--
+-- genesis f[r nog vara r'tt liten, ej rekursiv
+-- eller take 3
+-- eller gen typ (arbitrary i QC)
+--
+-- om vi vill slumpa v'rden finns det bibliotek f;r det
+--
+-- 1 Generera mutanter
+--
+-- Literals: mutera t.ex. integer literals
+-- 2'
+--
+-- första steg:
+-- om vi muterar 1 + 1: gör ingenting
+--
+-- sen:
+-- fixa mutate x för Int så att mutate x = [x+1, x-1]
+--
+--
+--
