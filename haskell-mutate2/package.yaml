@@ -24,6 +24,7 @@ dependencies:
 - haskell-src-exts
 - directory
 - pretty-simple
+- process
 
 library:
   source-dirs: src

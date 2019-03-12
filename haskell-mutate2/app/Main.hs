@@ -2,6 +2,7 @@ module Main where
 
 import System.Environment
 import System.Directory
+import System.Process
 
 import Text.Pretty.Simple
 
@@ -14,6 +15,7 @@ main = do
     args <- getArgs
 
     case args of
+        "--dir"     : xs    -> launchAtDir $ head xs
         "--help"    : xs    -> showUsage
         "--version" : xs    -> putStrLn version
         _                   -> launch args
@@ -25,6 +27,19 @@ showUsage :: IO ()
 showUsage = do
     putStrLn "haskell-mutate2 version 0.1.0.0"
     putStrLn "Usage: haskell-mutate2 SOURCE"
+
+launchAtDir :: String -> IO ()
+launchAtDir path = do
+    putStrLn $ "Attempting to run haskell-mutate2 at " ++ path
+    putStrLn $ ""
+
+    let cdDir    = "cd " ++ path ++ ";"
+    let announce = "echo MOVED TO THIS DIRECTORY: ;"
+    let pwd      = "pwd ;"
+
+    r <- createProcess (shell $ cdDir ++ announce ++ pwd)
+
+    putStrLn $ "Finished."
 
 launch :: [String] -> IO ()
 launch args = case length args of
