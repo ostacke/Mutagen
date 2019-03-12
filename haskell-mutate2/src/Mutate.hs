@@ -84,10 +84,22 @@ instance Mutable (Decl a) where
         _ -> []
 
 instance Mutable (Rhs a) where
-    mutate rhs = case rhs of
-        UnGuardedRhs l exp -> m1 (UnGuardedRhs l) exp
+    mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
 
-        _ -> []
+    mutate (GuardedRhss l guardedRhss) = m1 (GuardedRhss l) guardedRhss
+
+    mutate _ = []
+
+instance Mutable (GuardedRhs a) where
+    mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
+
+instance Mutable (Stmt a) where
+    mutate _ = []
+
+instance Mutable (Binds a) where
+    mutate (BDecls l decls) = m1 (BDecls l) decls
+    mutate _ = []
+    -- TODO: mutate (IPBinds l ipbinds) = m1 (BDecls l) ipbinds
 
 instance Mutable (Match a) where
     mutate match = case match of
@@ -119,12 +131,35 @@ instance Mutable (QName a) where
     mutate rest = []
 
 instance Mutable (Literal a) where
-    mutate (Int l int str) = map (\x -> Int l x (show x)) [int + 1, int - 1]
+    mutate (Int l int _)  = mapLit (Int l) int (intMuts int)
+        where intMuts n = [0, 1, n+1, n-1, n*(-1)]
 
-instance Mutable (Maybe a) where
-    mutate rest = []
+    mutate (Frac l rat _) = mapLit (Frac l) rat (ratMuts rat)
+        where ratMuts r = [0, 1, r+1, r-1, r*(-1), r/2, r*2, r/10, r*10,
+                           (r * 2)/2, (r/2)*2, 
+                           fromIntegral $ truncate r,
+                           fromIntegral $ floor r, 
+                           fromIntegral $ ceiling r, 
+                           fromIntegral $ round r]
+
+    mutate (Char l char _) = mapLit (Char l) char (charMuts char)
+        where charMuts c = [succ c, pred c, 'x', 'a']
+
+    mutate (String l str _) = mapLit (String l) str (strMuts str)
+        where strMuts xs = [' ':xs, tail xs, reverse xs, init xs, xs ++ " "]
+
+    -- TODO: Unboxed literals(?)
+
+    mutate _ = []
+-- Helper function for mutate on Literals
+mapLit constr param xs = map (\x -> constr x (show x)) xs
+
+instance (Mutable a) => Mutable (Maybe a) where
+    mutate (Just a) = Nothing : m1 Just a
+    mutate _        = []
 
 instance (Mutable a) => Mutable [a] where
     mutate []     = []
     mutate (x:xs) = m2 (:) x xs
+
 
