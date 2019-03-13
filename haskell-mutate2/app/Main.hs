@@ -2,6 +2,7 @@ module Main where
 
 import System.Environment
 import System.Directory
+import System.FilePath ((</>))
 import System.Process
 
 import Text.Pretty.Simple
@@ -30,16 +31,18 @@ showUsage = do
 
 launchAtDir :: String -> IO ()
 launchAtDir path = do
-    putStrLn $ "Attempting to run haskell-mutate2 at " ++ path
-    putStrLn $ ""
+    exists <- doesDirectoryExist path
 
-    let cdDir    = "cd " ++ path ++ ";"
-    let announce = "echo MOVED TO THIS DIRECTORY: ;"
-    let pwd      = "pwd ;"
+    if not exists
+        then putStrLn $ "ERROR: Directory '" ++ path ++ "' does not exist."
+        else do
+            files <- getAbsoluteDirContents path
+            mutateOnPaths $ filter (\xs -> drop (length xs - 3) xs == ".hs") files
 
-    r <- createProcess (shell $ cdDir ++ announce ++ pwd)
-
-    putStrLn $ "Finished."
+getAbsoluteDirContents :: String -> IO [FilePath]
+getAbsoluteDirContents dir = do
+    contents <- listDirectory dir
+    return $ map (dir </>) contents
 
 launch :: [String] -> IO ()
 launch args = case length args of
@@ -50,13 +53,14 @@ launch args = case length args of
         putStrLn $ "Attempting to parse and mutate file..."
         putStrLn $ ""
 
-        mutateOnPath (head args)
+        mutateOnPaths [(head args)]
 
     _ -> showUsage
 
-mutateOnPath :: String -> IO ()
-mutateOnPath path = do
-    res <- parseFile path
+mutateOnPaths :: [String] -> IO ()
+mutateOnPaths []     = return ()
+mutateOnPaths (x:xs) = do
+    res <- parseFile x
     case res of
         ParseOk ast -> do
             putStrLn $ "Parsing successful, creating mutants..."
@@ -66,7 +70,7 @@ mutateOnPath path = do
             -- pPrintNoColor mutantTrees
 
             putStrLn $ "Mutants created, writing to output files..."
-            writeMutants path mutantTrees
+            writeMutants x mutantTrees
 
             putStrLn $ "Finished writing mutants to files."
 
@@ -74,6 +78,9 @@ mutateOnPath path = do
             putStrLn $ "Parsing failed:"
             putStrLn $ ""
             putStrLn $ errMsg
+
+    mutateOnPaths xs
+
 
 writeMutants :: String -> [Module l] -> IO ()
 writeMutants _ []        = return ()
@@ -94,3 +101,5 @@ writeMutants path (x:xs) = do
     withCurrentDirectory outputDir $ writeFile path (prettyPrint x)
 
     writeMutants path xs
+
+

@@ -25,6 +25,7 @@ dependencies:
 - directory
 - pretty-simple
 - process
+- filepath
 
 library:
   source-dirs: src
