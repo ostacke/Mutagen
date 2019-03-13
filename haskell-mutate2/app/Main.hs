@@ -78,9 +78,8 @@ mutateOnPath path = do
 writeMutants :: String -> [Module l] -> IO ()
 writeMutants _ []        = return ()
 writeMutants path (x:xs) = do
-    let outputDir = "out"
+    let outputDir = "out/out" ++ show (length xs)
     createDirectoryIfMissing True outputDir
-
 
     let mutantPath = path ++ "-mutant-" ++ show (length xs) ++ ".hs"
 
@@ -92,6 +91,6 @@ writeMutants path (x:xs) = do
     putStrLn $ ""
     putStrLn $ prettyPrint x
 
-    -- withCurrentDirectory outputDir $ writeFile mutantPath (prettyPrint x)
+    withCurrentDirectory outputDir $ writeFile path (prettyPrint x)
 
     writeMutants path xs
