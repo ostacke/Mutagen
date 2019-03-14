@@ -120,22 +120,22 @@ instance Mutable (Exp a) where
     mutate (InfixApp l e1 qOp e2)       = m3 (InfixApp l) e1 qOp e2
     mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
     mutate (Lit l literal)              = m1 (Lit l) literal
-    mutate rest = []
+    mutate _                            = []
 
 instance Mutable (QOp a) where
     mutate (QVarOp l qName) = m1 (QVarOp l) qName
-    mutate rest             = []
+    mutate _                = []
 
 instance Mutable (QName a) where
     mutate (UnQual l name) = m1 (UnQual l) name
-    mutate rest = []
+    mutate _               = []
 
 instance Mutable (Literal a) where
     mutate (Int l int _)  = mapLit (Int l) int (intMuts int)
-        where intMuts n = [0, 1, n+1, n-1, n*(-1)]
+      where intMuts n = filter (/= n) [0, 1, n+1, n-1, n*(-1)]
 
     mutate (Frac l rat _) = mapLit (Frac l) rat (ratMuts rat)
-        where ratMuts r = [0, 1, r+1, r-1, r*(-1), r/2, r*2, r/10, r*10,
+      where ratMuts r = filter (/= r) [0, 1, r+1, r-1, r*(-1), r/2, r*2, r/10, r*10,
                            (r * 2)/2, (r/2)*2, 
                            fromIntegral $ truncate r,
                            fromIntegral $ floor r, 
@@ -143,10 +143,15 @@ instance Mutable (Literal a) where
                            fromIntegral $ round r]
 
     mutate (Char l char _) = mapLit (Char l) char (charMuts char)
-        where charMuts c = [succ c, pred c, 'x', 'a']
+      where constChars = ['x', 'a', '%', '\0', '\n']
+            charMuts c = filter (/= c) $ (case c of
+                                           minBound -> [succ c]
+                                           maxBound -> [pred c]
+                                           _ -> [succ c, pred c]
+                                         ) ++ constChars
 
     mutate (String l str _) = mapLit (String l) str (strMuts str)
-        where strMuts xs = [' ':xs, tail xs, reverse xs, init xs, xs ++ " "]
+      where strMuts xs = filter (/= xs) ["", ' ':xs, tail xs, reverse xs, init xs, xs ++ " "]
 
     -- TODO: Unboxed literals(?)
 
