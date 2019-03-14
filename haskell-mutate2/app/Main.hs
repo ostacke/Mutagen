@@ -40,25 +40,28 @@ launchAtDir inputDir outputDir = do
     absOutputDir <- canonicalizePath outputDir
 
     {- FOR DEBUGGING -}
-    print absInputDir
-    print absOutputDir
+    putStrLn $ "Input directory: " ++ show absInputDir
+    putStrLn $ "Output directory: " ++ show absOutputDir
 
     exists <- doesDirectoryExist absInputDir
 
     if exists
         then do
             filePaths <- getAbsoluteDirContents inputDir
-            mutants <- mutateFiles filePaths
-            --writeMutantsToFiles
+            mutants <- mapM mutateFile filePaths
+            
+            -- Here, mutants is a list of lists of Modules.
+            -- Each list of Modules represents all the mutation variations 
+            -- for that one Module.
 
             {- FOR DEBUGGING -}
-            putStrLn $ show filePaths
-            putStrLn $ "Number of mutants: "  ++ show (length mutants)
+            putStrLn $ "File paths: " ++ show filePaths
+            putStrLn $ "Number of mutants: " ++ show (length mutants)            
 
+            putStrLn $ prettyPrint $ head $ head mutants
 
         else 
             putStrLn $ "ERROR: Directory '" ++ inputDir ++ "' does not exist."
-
 
 -- | Given a path to a directory, returns a list of the absolute paths for 
 --   every file at the directory.
@@ -68,11 +71,8 @@ getAbsoluteDirContents dir = do
     let relativePaths = map (dir </>) contents
     mapM canonicalizePath relativePaths
 
--- | Runs mutate on all files from a given list of file paths, returns 
---   a list of mutated Modules
-mutateFiles :: [FilePath] -> IO ([[Module SrcSpanInfo]])
-mutateFiles paths = mapM mutateFile paths
-
+-- | Attemps to parse a module at the given file path, returning the 
+--   mutation results if successful.
 mutateFile :: FilePath -> IO ([Module SrcSpanInfo])
 mutateFile [] = return []
 mutateFile path = do
@@ -81,6 +81,7 @@ mutateFile path = do
     case parseRes of
         ParseOk ast -> do
             let mutantTrees = mutate ast
+            print mutantTrees
             return mutantTrees
         ParseFailed l errMsg -> do
             putStrLn $ "Parsing failed:"
