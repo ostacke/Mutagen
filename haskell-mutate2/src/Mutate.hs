@@ -1,5 +1,6 @@
 module Mutate
     ( mutate
+    , safeMutate
     ) where
 
 import GHC.Float
@@ -10,6 +11,9 @@ import Data.List
 --   class as an argument, and the result is of the same type. (?)
 class Mutable a where
     mutate :: a -> [a]
+
+safeMutate :: (Mutable a, Eq a) => a -> [a]
+safeMutate a = filter (/= a) $ nub $ mutate a
 
 m1 :: (Mutable a) => (a -> b) -> a -> [b]
 m1 f a = aMutants
