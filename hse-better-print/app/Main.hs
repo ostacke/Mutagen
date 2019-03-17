@@ -33,10 +33,3 @@ output m path = do
     putStrLn $ prettyPrint m
     putStrLn $ ""    
 
-    {- Currently doesn't show up correctly when cat-ing output file -}
-    putStrLn $ "Writing output to file: " ++ newPath
-    writeFile newPath $ show (pShowNoColor m)
-    putStrLn $ "Finished writing to file."
-    
-        where newPath = path ++ ".pretty.hs"
-    
