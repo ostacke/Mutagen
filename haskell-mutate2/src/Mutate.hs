@@ -65,8 +65,11 @@ m5 f a b c d e = aMutants ++ bMutants ++ cMutants ++ dMutants ++ eMutants
           eMutants = map (\x -> f a b c d x) eMutant
 
 instance (Show a) => Mutable (Module a) where
-    mutate (Module l mbyHead pragmas importDecls decls) =
-        m4 (Module l) mbyHead pragmas importDecls decls
+    mutate mod = case mod of
+        Module l mbyHead pragmas importDecls decls -> 
+            mod : m4 (Module l) mbyHead pragmas importDecls decls
+        -- Returns the original module concatenated by all the variations,
+        -- helps with output later.
 
 instance Mutable (ModuleHead a) where
     mutate rest = []
