@@ -2,8 +2,11 @@ module Main where
 
 import System.Environment
 import System.Directory
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeFileName)
 import System.Process
+import System.IO
+
+import Data.Maybe (fromJust)
 
 import Text.Pretty.Simple
 
@@ -40,10 +43,6 @@ launchAtDir inputDir outputDir = do
     absInputDir <- canonicalizePath inputDir
     absOutputDir <- canonicalizePath outputDir
 
-    {- FOR DEBUGGING -}
-    putStrLn $ "Input directory: " ++ show absInputDir
-    putStrLn $ "Output directory: " ++ show absOutputDir
-
     exists <- doesDirectoryExist absInputDir
 
     if exists
@@ -55,13 +54,19 @@ launchAtDir inputDir outputDir = do
             -- Each list of Modules represents all the mutation variations 
             -- for that one Module.
 
-            writeMutants outputDir mutants
+            let combinations = combineMutants [] mutants
+            outputMutants absOutputDir combinations
 
-            {- FOR DEBUGGING -}
-            putStrLn $ "File paths: " ++ show filePaths
-            putStrLn $ "Number of mutants: " ++ show (length (concat mutants))
+            putStrLn ""
+            putStrLn "File paths of input files: "
+            mapM_ putStrLn filePaths
+            putStrLn ""
 
-            putStrLn $ prettyPrint $ head $ head mutants
+            putStrLn $ "Input directory: " ++ show absInputDir
+            putStrLn $ "Output directory: " ++ show absOutputDir
+            putStrLn ""
+
+            putStrLn $ "Total number of mutants: " ++ show (length (concat mutants))
 
         else 
             putStrLn $ "ERROR: Directory '" ++ inputDir ++ "' does not exist."
@@ -69,59 +74,59 @@ launchAtDir inputDir outputDir = do
 -- TODO
 writeMutants :: FilePath -> [[Module SrcSpanInfo]] -> IO ()
 writeMutants outputDir mutants = do
-    let generated = ultraCombine mutants
+    let combinations = combineMutants [] mutants
     
     {- FOR DEBUGGING -}
-    mapM pPrintNoColor (map (map (map prettyPrint)) generated)
+    mapM_ pPrintNoColor $ map (map (map prettyPrint)) combinations
 
-    return ()
+    outputMutants outputDir combinations
 
--- | TODO: Do this in a better way
-ultraCombine :: [[Module SrcSpanInfo]] -> [[[Module SrcSpanInfo]]]
-ultraCombine [] = []
-ultraCombine mutants = createVariants [] mutants
-
-createVariants :: [[Module SrcSpanInfo]]
+combineMutants :: [[Module SrcSpanInfo]]
                -> [[Module SrcSpanInfo]]
                -> [[[Module SrcSpanInfo]]]
-createVariants _ [] = []
-createVariants xs (y:ys) = [ x : originals | x <- y ] : createVariants (xs ++ [y]) ys
-    where originals = getOriginals xs ++ getOriginals ys
+combineMutants _ [] = []
+combineMutants xs (y:ys) = 
+    [ x : originals | x <- y ] : combineMutants (xs ++ [y]) ys
+        where originals = getOriginals xs ++ getOriginals ys
 
 getOriginals :: [[Module SrcSpanInfo]] -> [Module SrcSpanInfo]
 getOriginals [] = []
 getOriginals (xs:xss) | null xs   = getOriginals xss
                       | otherwise = head xs : getOriginals xss
 
-{-
--- | Handles outputting the mutated modules for one particular source module.
-writeMutants' :: FilePath -> Int -> [[Module SrcSpanInfo]] -> IO ()
-writeMutants' subDir mutIndex mutants = do
-    -- beforeMuts and afterMuts are of form [[Module SrcSpanInfo]]
-    let beforeMuts = take mutIndex mutants
-    let afterMuts  = drop (mutIndex + 1) mutants
-
-    -- While targetMuts is of form [Module SrcSpanInfo]
-    let targetMuts = mutants !! mutIndex
-    
-    let originals = getOriginals (beforeMuts ++ afterMuts)
-    
-    let combinations = [ x : originals | x <- targetMuts ]
-
-    outputMutants subDir combinations
-
-        where getOriginals = map head
-
--- | Outputs the mutant variations to folders.
-outputMutants :: FilePath -> [[Module SrcSpanInfo]] -> IO ()
+outputMutants :: FilePath -> [[[Module SrcSpanInfo]]] -> IO ()
 outputMutants _ [] = return ()
-outputMutants dir mutants = do
-    createDirectory $ dir </> show (length mutants)
+outputMutants dir (x:xs) = do
+    let workingDir = dir </> show (length (x:xs))
+    createDirectoryIfMissing True workingDir
+    outputMutants' workingDir x
 
-    mapM (withCurrentDirectory (action))
+    outputMutants dir xs
 
-    return ()
--}
+outputMutants' :: FilePath -> [[Module SrcSpanInfo]] -> IO ()
+outputMutants' _ [] = return ()
+outputMutants' dir (x:xs) = do
+    let workingDir = dir </> show (length (x:xs))
+    createDirectoryIfMissing True workingDir
+    outputMutants'' workingDir x
+
+    outputMutants' dir xs
+
+outputMutants'' :: FilePath -> [Module SrcSpanInfo] -> IO ()
+outputMutants'' _ [] = return ()
+outputMutants'' dir (x:xs) = do
+    let newPath = dir </> (takeFileName $ fromJust (getPath x))
+
+    handle <- openFile newPath WriteMode
+    hPutStrLn handle (prettyPrint x)
+    hClose handle
+    
+    outputMutants'' dir xs
+
+getPath :: Module SrcSpanInfo -> Maybe FilePath
+getPath mod = case mod of
+    Module (SrcSpanInfo (SrcSpan fileName _ _ _ _) _) _ _ _ _ -> Just fileName
+    _ -> Nothing
 
 -- | Given a path to a directory, returns a list of the absolute paths for 
 --   every file at the directory.
@@ -152,88 +157,3 @@ mutateFile path = do
             putStrLn errMsg
             putStrLn ""
             return []
-
-{- 
-main :: IO ()
-main = do
-    args <- getArgs
-
-    case args of
-        "--dir"     : xs    -> launchAtDir $ head xs
-        "--help"    : xs    -> showUsage
-        "--version" : xs    -> putStrLn version
-        _                   -> launch args
-
-version :: String
-
-
-
-
-launchAtDir :: String -> IO ()
-launchAtDir dir = do
-    exists <- doesDirectoryExist dir
-
-    if not exists
-        then putStrLn $ "ERROR: Directory '" ++ dir ++ "' does not exist."
-        else do
-            files <- getAbsoluteDirContents dir
-            mutateOnPaths dir $ filter (\xs -> drop (length xs - 3) xs == ".hs") files
-
-
-
-launch :: [String] -> IO ()
-launch args = case length args of
-    0 -> showUsage
-    1 -> do
-        putStrLn $ ""
-        putStrLn $ "Please specify a path with the --dir option."
-        putStrLn $ ""
-
-    _ -> showUsage
-
-mutateOnPaths :: FilePath -> [String] -> IO ()
-mutateOnPaths _ [] = return ()
-mutateOnPaths outputDir (x:xs) = do
-    res <- parseFile x
-    case res of
-        ParseOk ast -> do
-            putStrLn $ "Parsing successful, creating mutants..."
-            let mutantTrees = mutate ast
-
-            -- FOR DEBUGGING
-            -- pPrintNoColor mutantTrees
-
-            putStrLn $ "Mutants created, writing to output files..."
-            writeMutants outputDir x mutantTrees
-
-            putStrLn $ "Finished writing mutants to files."
-
-        ParseFailed l errMsg -> do
-            putStrLn $ "Parsing failed:"
-            putStrLn $ ""
-            putStrLn $ errMsg
-
-    mutateOnPaths outputDir xs
-
-
-writeMutants :: FilePath -> String -> [Module l] -> IO ()
-writeMutants _ _ []        = return ()
-writeMutants outputDirParent path (x:xs) = do
-    let outputDir = outputDirParent </> "out" </> show (length xs)
-    createDirectoryIfMissing True outputDir
-
-    let mutantPath = path ++ "-mutant-" ++ show (length xs) ++ ".hs"
-
-    {- FOR DEBUGGING -}
-
-    putStrLn $ ""
-    putStrLn $ ":: Path of mutant: " ++ mutantPath
-    putStrLn $ ":: Prettyprint of mutant: "
-    putStrLn $ ""
-    putStrLn $ prettyPrint x
-
-    withCurrentDirectory outputDir $ writeFile path (prettyPrint x)
-
-    writeMutants outputDirParent path xs
-
--}
