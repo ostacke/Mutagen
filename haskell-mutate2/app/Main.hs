@@ -34,6 +34,7 @@ showUsage = do
     putStrLn "--output-dir DIRECTORY    Specifies output location of result."
     putStrLn "                          Defaults to ./out."
 
+
 launchAtDir :: FilePath -> FilePath -> IO ()
 launchAtDir inputDir outputDir = do
     absInputDir <- canonicalizePath inputDir
@@ -54,14 +55,73 @@ launchAtDir inputDir outputDir = do
             -- Each list of Modules represents all the mutation variations 
             -- for that one Module.
 
+            writeMutants outputDir mutants
+
             {- FOR DEBUGGING -}
             putStrLn $ "File paths: " ++ show filePaths
-            putStrLn $ "Number of mutants: " ++ show (length mutants)            
+            putStrLn $ "Number of mutants: " ++ show (length (concat mutants))
 
             putStrLn $ prettyPrint $ head $ head mutants
 
         else 
             putStrLn $ "ERROR: Directory '" ++ inputDir ++ "' does not exist."
+
+-- TODO
+writeMutants :: FilePath -> [[Module SrcSpanInfo]] -> IO ()
+writeMutants outputDir mutants = do
+    let generated = ultraCombine mutants
+    
+    {- FOR DEBUGGING -}
+    mapM pPrintNoColor (map (map (map prettyPrint)) generated)
+
+    return ()
+
+-- | TODO: Do this in a better way
+ultraCombine :: [[Module SrcSpanInfo]] -> [[[Module SrcSpanInfo]]]
+ultraCombine [] = []
+ultraCombine mutants = createVariants [] mutants
+
+createVariants :: [[Module SrcSpanInfo]]
+               -> [[Module SrcSpanInfo]]
+               -> [[[Module SrcSpanInfo]]]
+createVariants _ [] = []
+createVariants xs (y:ys) = [ x : originals | x <- y ] : createVariants (xs ++ [y]) ys
+    where originals = getOriginals xs ++ getOriginals ys
+
+getOriginals :: [[Module SrcSpanInfo]] -> [Module SrcSpanInfo]
+getOriginals [] = []
+getOriginals (xs:xss) | null xs   = getOriginals xss
+                      | otherwise = head xs : getOriginals xss
+
+{-
+-- | Handles outputting the mutated modules for one particular source module.
+writeMutants' :: FilePath -> Int -> [[Module SrcSpanInfo]] -> IO ()
+writeMutants' subDir mutIndex mutants = do
+    -- beforeMuts and afterMuts are of form [[Module SrcSpanInfo]]
+    let beforeMuts = take mutIndex mutants
+    let afterMuts  = drop (mutIndex + 1) mutants
+
+    -- While targetMuts is of form [Module SrcSpanInfo]
+    let targetMuts = mutants !! mutIndex
+    
+    let originals = getOriginals (beforeMuts ++ afterMuts)
+    
+    let combinations = [ x : originals | x <- targetMuts ]
+
+    outputMutants subDir combinations
+
+        where getOriginals = map head
+
+-- | Outputs the mutant variations to folders.
+outputMutants :: FilePath -> [[Module SrcSpanInfo]] -> IO ()
+outputMutants _ [] = return ()
+outputMutants dir mutants = do
+    createDirectory $ dir </> show (length mutants)
+
+    mapM (withCurrentDirectory (action))
+
+    return ()
+-}
 
 -- | Given a path to a directory, returns a list of the absolute paths for 
 --   every file at the directory.
@@ -73,7 +133,7 @@ getAbsoluteDirContents dir = do
 
 -- | Attemps to parse a module at the given file path, returning the 
 --   mutation results if successful.
-mutateFile :: FilePath -> IO ([Module SrcSpanInfo])
+mutateFile :: FilePath -> IO [Module SrcSpanInfo]
 mutateFile [] = return []
 mutateFile path = do
     parseRes <- parseFile path
@@ -81,12 +141,16 @@ mutateFile path = do
     case parseRes of
         ParseOk ast -> do
             let mutantTrees = mutate ast
-            print mutantTrees
+            
+            {- FOR DEBUGGING -}
+            -- print mutantTrees
+            
             return mutantTrees
         ParseFailed l errMsg -> do
-            putStrLn $ "Parsing failed:"
-            putStrLn $ ""
-            putStrLn $ errMsg
+            putStrLn "PARSING FAILED:"
+            putStrLn ""
+            putStrLn errMsg
+            putStrLn ""
             return []
 
 {- 
