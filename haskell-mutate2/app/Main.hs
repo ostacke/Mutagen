@@ -84,7 +84,7 @@ mutateFile path = do
 
     case parseRes of
         ParseOk syntaxTree -> do
-            let mutantTrees = mutate syntaxTree
+            let mutantTrees = safeMutate syntaxTree
             return mutantTrees
 
         ParseFailed l errMsg -> do
