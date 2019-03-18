@@ -5,7 +5,7 @@ import Data.Maybe (fromJust)
 import Language.Haskell.Exts
 import System.Environment
 import System.Directory
-import System.FilePath ((</>), takeFileName)
+import System.FilePath ((</>), takeFileName, takeExtension)
 import System.Process
 import System.IO
 import Text.Pretty.Simple
@@ -53,7 +53,8 @@ launchAtDir inputDir outputDir = do
         then do
             -- Performs the actual mutating and outputs to files
             filePaths <- getAbsoluteDirContents inputDir
-            mutants <- mapM mutateFile filePaths
+            let hsPaths = filter (\x -> takeExtension x == ".hs") filePaths
+            mutants <- mapM mutateFile hsPaths
 
             let combinations = combineMutants mutants
             outputMutants absOutputDir combinations
@@ -61,7 +62,7 @@ launchAtDir inputDir outputDir = do
             -- Prints some information of what happened:
             putStrLn ""
             putStrLn "File paths of input files: "
-            mapM_ putStrLn filePaths
+            mapM_ putStrLn hsPaths
             putStrLn ""
 
             putStrLn $ "Input directory: " ++ show absInputDir
