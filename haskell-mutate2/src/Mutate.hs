@@ -71,20 +71,63 @@ instance (Show a) => Mutable (Module a) where
         -- Returns the original module concatenated by all the variations,
         -- helps with output later.
 
+{-  ModuleHead includes the name and export information. Should
+    probably remain unmutated.
+-}
 instance Mutable (ModuleHead a) where
     mutate rest = []
 
+{-  ModulePragma contains messages to the compiler. Should probably
+    remain unmutated.
+-}
 instance Mutable (ModulePragma a) where
     mutate rest = []
 
+{-  ImportDecl contains import declarations. Should probably remain
+    unmutated.
+-}
 instance Mutable (ImportDecl a) where
   mutate rest = []
 
+{-  Decl is the top level of all the declarations and functions
+    in a Haskell file.
+-}
 instance Mutable (Decl a) where
     mutate decl = case decl of
+        TypeDecl l declHead typ -> [] --TODO
+        TypeFamDecl l declHead resultSig injectivityInfo -> [] --TODO
+        ClosedTypeFamDecl l declHead resultSig injectivityInfo typeEqn -> [] --TODO
+        DataDecl l dataOrNew context declHead qualConDecl derivin -> [] --TODO
+        GDataDecl l dataOrNew context declHead kind gadtDecl derivin -> [] --TODO
+        DataFamDecl l context declHead resultSig -> [] --TODO
+        TypeInsDecl l typ1 typ2 -> [] --TODO
+        DataInsDecl l dataOrNew typ qualConDecl derivin -> [] --TODO
+        GDataInsDecl l dataOrNew typ qualConDecl derivin .> [] --TODO
+        ClassDecl l context declHead funDep classDecl -> [] --TODO
+        InstDecl l overlap instRule instDecl -> [] --TODO
+        DerivDecl l derivStrategy overlap instRule -> [] --TODO
+        InfixDecl l assoc int op -> [] --TODO
+        DefaultDecl l typ -> [] --TODO
+        SpliceDecl l exp -> [] --TODO
+        TypeSig l name typ -> [] --TODO
+        PatSynSig l name tyVarBind context tyVarBind context typ -> [] --TODO
+        FunBind l match -> [] --TODO
         PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
-
-        _ -> []
+        PatSyn l pat1 pat2 patternSynDirection -> [] --TODO
+        ForImp l callConv safety string name typ -> [] --TODO
+        ForExp l callConv string name typ -> [] --TODO
+        RulePragmaDecl l rule -> [] --TODO
+        DeprPragmaDecl l nameString -> [] --TODO
+        WarnPragmaDecl l nameString -> [] --TODO
+        InlineSig l bool activation qName -> [] --TODO
+        InlineConlikeSig l activation qName -> [] --TODO
+        SpecSig l activation qName typ -> [] --TODO
+        SpecInlineSig l bool activation qName typ -> [] --TODO
+        InstSig l instRule -> [] --TODO
+        AnnPragma l booleanFormula -> [] --TODO
+        MinimalPragma l booleanFormula -> [] --TODO
+        RoleAnnotDecl l qName role -> [] --TODO
+        completePragma l name qName -> [] --TODO
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
