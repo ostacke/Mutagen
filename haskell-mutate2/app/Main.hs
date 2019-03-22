@@ -19,6 +19,7 @@ main = do
 
     case args of
         "--help"       : _  -> showUsage
+        "--input-file" : xs -> launchAtProject (head xs) (getProjectDir $ tail xs)
         "--input-dir"  : xs -> launchAtDir (head xs) (getOutputDir $ tail xs)
 
         _ -> showUsage
@@ -31,13 +32,69 @@ getOutputDir (x:xs) = case x of
     _ -> getOutputDir xs
 
 
+getProjectDir :: [String] -> String
+getProjectDir [] = "./"
+getProjectDir (x:xs) = case x of
+    "--project-dir" -> head xs
+    _ -> getProjectDir xs
+
+
 showUsage :: IO ()
 showUsage = do 
     putStrLn "Usage: haskell-mutate2-exe [OPTION]..."
     putStrLn "--help                    Shows this text."
+    putStrLn "--input-file FILE         Specifies input file to mutate."
     putStrLn "--input-dir DIRECTORY     Specifies location of files to mutate."
     putStrLn "--output-dir DIRECTORY    Specifies output location of result."
     putStrLn "                          Defaults to ./out."
+    putStrLn "--project-dir DIRECTORY   Specifies directory of cabal project."
+    putStrLn "                          Should contain a .cabal file and "
+    putStrLn "                          defaults to ./"
+
+
+
+launchAtProject :: FilePath -> FilePath -> IO ()
+launchAtProject fPath pPath = do
+    projectPath <- makeAbsolute pPath
+    filePath <- makeAbsolute fPath
+    projContents <- getAbsoluteDirContents projectPath
+
+    -- Create folder to put backup of original source file
+    let backupDir = projectPath </> "backups"
+    createDirectoryIfMissing False backupDir
+    
+    -- Copy file to backup at new backup path
+    withCurrentDirectory backupDir $ copyFile filePath (backupDir </> takeFileName filePath)
+
+    -- Get mutations of target file
+    mutantModules <- mutateFile filePath
+    putStrLn $ (show $ length mutantModules) ++ " mutants created."
+
+    -- Run tests with mutants
+    runTestsWithMutants filePath mutantModules projectPath
+
+    return ()
+    
+
+runTestsWithMutants :: FilePath -> [Module SrcSpanInfo] -> FilePath -> IO ()
+runTestsWithMutants _ [] _ = putStrLn "ASDFASDFASDF"
+runTestsWithMutants filePath (m:ms) projectPath = do
+    -- Remove old file and write mutant to file
+    removeFile filePath
+    putStrLn "Writing mutant to file..."
+    writeFile filePath (prettyPrint m)
+
+    putStrLn ""
+    putStrLn "Attempting to run 'cabal test' with the follwing mutant: "
+    putStrLn ""
+    putStrLn $ prettyPrint m
+    putStrLn ""
+
+    -- Run cabal test with the new mutant
+    setCurrentDirectory projectPath
+    callCommand "cabal test"
+
+    runTestsWithMutants filePath ms projectPath
 
 
 -- | Tries to run the mutation process on all files at the input directory, 
