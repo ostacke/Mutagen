@@ -70,10 +70,12 @@ m5 f a b c d e = aMutants ++ bMutants ++ cMutants ++ dMutants ++ eMutants
 
 instance (Show a) => Mutable (Module a) where
     mutate mod = case mod of
-        Module l mbyHead pragmas importDecls decls -> 
-            mod : m4 (Module l) mbyHead pragmas importDecls decls
+        Module l (Just moduleHead) pragmas importDecls decls -> 
+            mod : m3 (Module l (Just moduleHead)) pragmas importDecls decls
         -- Returns the original module concatenated by all the variations,
-        -- helps with output later.
+        -- helps with output later. Also retains the modulehead
+        Module l mbyHead pragmas importDecls decls ->
+            mod : m4 (Module l) mbyHead pragmas importDecls decls
 
 instance Mutable (ModuleHead a) where
     mutate rest = []
