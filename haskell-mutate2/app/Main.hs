@@ -7,7 +7,7 @@ import Language.Haskell.Exts
 import System.Environment
 import System.Exit
 import System.Directory
-import System.FilePath ((</>), takeFileName, takeExtension)
+import System.FilePath ((</>), (-<.>), takeFileName, takeExtension)
 import System.Process
 import System.IO
 import System.IO.Error
@@ -15,16 +15,25 @@ import Text.Pretty.Simple
 
 import Mutate
 
-
 data TestSummary = TestSummary
     { successful :: Int -- ^ Number of tests that were successfully run and passed.
     , failed     :: Int -- ^ Number of tests that ran but failed.
     , errors     :: Int -- ^ Number of errors, e.g. compilation errors.
     } deriving (Show)
 
+-- | Data type representing how a mutant fared during a test suite, along with
+--   the output of stdout or stderr, depending on the result.
+data TestResult = Survived String   -- ^ Mutant survived the tests, stdout
+                | Killed String     -- ^ Tests killed the mutant, stdout
+                | Error String      -- ^ Tests threw an exception, stderr
+
 incSucc (TestSummary s f e) = TestSummary (s + 1) f e
 incFail (TestSummary s f e) = TestSummary s (f + 1) e
 incErr  (TestSummary s f e) = TestSummary s f (e + 1)
+
+
+outputSuffix = "mutants-out"
+backupSuffix = "backups"
 
 
 main :: IO ()
@@ -73,6 +82,9 @@ launchAtProject :: FilePath -- ^ Path to file to be mutated
                 -> FilePath -- ^ Path to project directory
                 -> IO ()
 launchAtProject filePath projectPath = do
+    -- Clean old output folder
+    wipeDirIfExists outputDir
+
     -- Back up original file to backup directory, creating the backup
     -- directory if not already existing.
     backupOriginal filePath backupDir
@@ -86,10 +98,21 @@ launchAtProject filePath projectPath = do
     -- Restore original file from backup
     restoreOriginal backupDir filePath
 
-    -- Print information
+    -- Print summary of test runs
     printResults testSummary
     
-    where backupDir = projectPath </> "backups"
+    where backupDir = projectPath </> backupSuffix
+          outputDir = projectPath </> outputSuffix
+
+
+-- | Deletes directory (recursively) if it exists and replaces it with a new,
+--   empty directory. Creates a new directory if it does not exist.
+wipeDirIfExists :: FilePath -> IO ()
+wipeDirIfExists dir = do
+    exists <- doesDirectoryExist dir
+    if exists then do removeDirectoryRecursive dir
+                      createDirectory dir
+              else createDirectory dir
 
 
 -- Functions for backing up original files and restoring them from backup.
@@ -134,36 +157,78 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
     -- Remove old file and write mutant to file.
     insertMutant
 
-    -- Display which mutant that is currently being used.
-    showMutant
-
-    -- Run tests with a process, reading its exit code and updating the 
-    -- summary accordingly.
+    -- Run tests with a process, returning its results
+    putStrLn $ "Testing mutant... (" ++ show (length $ m:ms) ++ " left)" 
     setCurrentDirectory projectPath
-    newSum <- testResHandler testSum =<< readProcessWithExitCode "cabal" ["test"] ""
+    exitStatus <- readProcessWithExitCode "cabal" ["test"] ""
+    let testResult = getTestResult exitStatus
+    
+    -- Perform actions depending on the results
+    testResHandler testResult m filePath (projectPath </> outputSuffix)
+
+    -- Update the summary values depending on the results
+    let newSum = updateSummary testSum testResult
 
     runTestsWithMutants filePath ms projectPath newSum
 
     where insertMutant = do removeFile filePath
                             writeFile filePath (prettyPrint m)
-          showMutant = do putStrLn "==> Running tests with the follwing mutant: "
-                          putStrLn (prettyPrint m)
-                          putStrLn ""
 
-testResHandler :: TestSummary -> (ExitCode, String, String) -> IO TestSummary
--- If testing was successful
-testResHandler testSum (ExitSuccess, _, _) = do
-    putStrLn "Testing succeeded; mutant SURVIVED.\n"
-    return $ incSucc testSum
 
--- If testing failed or returned an error
-testResHandler testSum (ExitFailure c, stdout, stderr) =
-    if null stderr 
-        then do putStrLn "Testing failed; mutant was KILLED.\n"
-                return $ incFail testSum
-        else do putStrLn "Testing returned an ERROR:\n"
-                putStrLn stderr
-                return $ incErr testSum
+getTestResult :: (ExitCode, String, String) -> TestResult
+getTestResult (ExitSuccess, stdout, _) = Survived stdout
+getTestResult (ExitFailure exitCode, stdout, stderr)
+    | null stderr = Killed stdout
+    | otherwise = Error stderr
+
+
+updateSummary :: TestSummary -> TestResult -> TestSummary
+updateSummary summary res = case res of
+    Survived _ -> incSucc summary
+    Killed _   -> incFail summary
+    Error _    -> incErr summary
+
+
+-- | Performs actions depending on the given TestResult:
+--   If mutant was killed, tell the user but do nothing else.
+--   If mutant survivied, print information and copy mutant to the given
+--   directory
+--   If testing returned an error, prints the information put does nohting else.
+testResHandler :: TestResult            -- ^ The test result to judge.
+               -> Module SrcSpanInfo    -- ^ The mutant that was tested.
+               -> FilePath              -- ^ The file path of the mutant.
+               -> FilePath              -- ^ The path of the output root directory.
+               -> IO ()
+testResHandler res mutant mutantPath outDir = case res of
+    Killed stdout -> putStrLn "Testing failed; mutant was KILLED."
+    
+    Error stderr -> do 
+        putStrLn "Testing returned an ERROR:\n"
+        putStrLn stderr
+    
+    Survived stdout -> do
+        -- Set up file names and paths
+        let mutantName = takeFileName mutantPath
+        let mutantsDir = outDir </> mutantName
+        createDirectoryIfMissing True mutantsDir
+        mutantIndex <- fmap length $ getAbsoluteDirContents mutantsDir
+        let newMutantPath = mutantsDir 
+                        </> mutantName 
+                       -<.> show mutantIndex ++ ".hs"
+
+        putStrLn "Testing succeeded; mutant SURVIVED.\n"
+        putStrLn   "==> The mutant that was being tested was:"
+        putStrLn $ "==> " ++ mutantPath
+
+        -- Write surviving mutant to file
+        putStrLn "Saving copy of mutant..."
+        writeFile newMutantPath $ prettyPrint mutant
+        putStrLn $ "Copy of mutant saved to: " ++ newMutantPath
+
+        -- For debugging, mostly:
+        putStrLn "==> The mutant looked like:"
+        putStrLn $ prettyPrint mutant
+        putStrLn ""
 
 
 -- | Tries to run the mutation process on all files at the input directory, 
