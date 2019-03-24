@@ -17,7 +17,7 @@ import Mutate
 
 
 data TestSummary = TestSummary
-    { successful :: Int -- ^ Number of tests that successfully ran and passed.
+    { successful :: Int -- ^ Number of tests that were successfully run and passed.
     , failed     :: Int -- ^ Number of tests that ran but failed.
     , errors     :: Int -- ^ Number of errors, e.g. compilation errors.
     } deriving (Show)
@@ -87,45 +87,44 @@ launchAtProject fPath pPath = do
     putStrLn $ (show $ length mutantModules) ++ " mutants created."
 
     -- Run tests with mutants
-    runTestsWithMutants filePath mutantModules projectPath (TestSummary 0 0 0)
+    testSummary <- runTestsWithMutants filePath mutantModules projectPath (TestSummary 0 0 0)
 
     -- Restore original file from backup
     putStrLn "Restoring original file from backup..."
     copyFile (backupDir </> takeFileName filePath) filePath
+    putStrLn ""
 
     -- Print information
-    putStrLn $ "In total, " ++ (show $ length mutantModules) 
-               ++ " mutants were created."
-
-    return ()
+    printResults testSummary
 
 
-runTestsWithMutants :: FilePath 
-                    -> [Module SrcSpanInfo]
-                    -> FilePath
+printResults :: TestSummary -> IO ()
+printResults (TestSummary s f e) = do
+    putStrLn ":: SUMMARY ::"
+    putStrLn $ "In total, " ++ show (s + f + e) ++ " mutants were created."
+    putStrLn $ "Number of mutants killed: " ++ show f
+    putStrLn $ "Number of mutants that survived: " ++ show s
+    putStrLn $ "Number of errors: " ++ show e
+
+
+runTestsWithMutants :: FilePath             -- ^ Path to source file to mutate.
+                    -> [Module SrcSpanInfo] -- ^ List of mutant ASTs.
+                    -> FilePath             -- ^ Path to project directory.
                     -> TestSummary
-                    -> IO TestSummary
+                    -> IO TestSummary       -- ^ Result summary of test runs.
 runTestsWithMutants _ [] _ testSum = return testSum
 runTestsWithMutants filePath (m:ms) projectPath testSum = do
     -- Remove old file and write mutant to file
     removeFile filePath
-    putStrLn "Writing mutant to file..."
     writeFile filePath (prettyPrint m)
 
-    putStrLn ""
     putStrLn "Attempting to run 'cabal test' with the follwing mutant: "
-    putStrLn ""
     putStrLn $ prettyPrint m
     putStrLn ""
 
     -- Run cabal test with the new mutant
     setCurrentDirectory projectPath
-    
-    newSum <- testResHandler testSum =<< readProcessWithExitCode "cabal" ["test"] "" 
-    
-    putStrLn "Result from test:"
-    print newSum
-    putStrLn ""
+    newSum <- testResHandler testSum =<< readProcessWithExitCode "cabal" ["test"] ""
 
     runTestsWithMutants filePath ms projectPath newSum
 
