@@ -1,16 +1,30 @@
 module Main where
 
+import Control.Exception
 import Control.Monad
 import Data.Maybe (fromJust)
 import Language.Haskell.Exts
 import System.Environment
+import System.Exit
 import System.Directory
 import System.FilePath ((</>), takeFileName, takeExtension)
 import System.Process
 import System.IO
+import System.IO.Error
 import Text.Pretty.Simple
 
 import Mutate
+
+
+data TestSummary = TestSummary
+    { successful :: Int -- ^ Number of tests that successfully ran and passed.
+    , failed     :: Int -- ^ Number of tests that ran but failed.
+    , errors     :: Int -- ^ Number of errors, e.g. compilation errors.
+    } deriving (Show)
+
+incSucc (TestSummary s f e) = TestSummary (s + 1) f e
+incFail (TestSummary s f e) = TestSummary s (f + 1) e
+incErr  (TestSummary s f e) = TestSummary s f (e + 1)
 
 
 main :: IO ()
@@ -73,7 +87,7 @@ launchAtProject fPath pPath = do
     putStrLn $ (show $ length mutantModules) ++ " mutants created."
 
     -- Run tests with mutants
-    runTestsWithMutants filePath mutantModules projectPath
+    runTestsWithMutants filePath mutantModules projectPath (TestSummary 0 0 0)
 
     -- Restore original file from backup
     putStrLn "Restoring original file from backup..."
@@ -84,11 +98,15 @@ launchAtProject fPath pPath = do
                ++ " mutants were created."
 
     return ()
-    
 
-runTestsWithMutants :: FilePath -> [Module SrcSpanInfo] -> FilePath -> IO ()
-runTestsWithMutants _ [] _ = putStrLn "ASDFASDFASDF"
-runTestsWithMutants filePath (m:ms) projectPath = do
+
+runTestsWithMutants :: FilePath 
+                    -> [Module SrcSpanInfo]
+                    -> FilePath
+                    -> TestSummary
+                    -> IO TestSummary
+runTestsWithMutants _ [] _ testSum = return testSum
+runTestsWithMutants filePath (m:ms) projectPath testSum = do
     -- Remove old file and write mutant to file
     removeFile filePath
     putStrLn "Writing mutant to file..."
@@ -102,9 +120,25 @@ runTestsWithMutants filePath (m:ms) projectPath = do
 
     -- Run cabal test with the new mutant
     setCurrentDirectory projectPath
-    callCommand "cabal test"
+    
+    newSum <- testResHandler testSum =<< readProcessWithExitCode "cabal" ["test"] "" 
+    
+    putStrLn "Result from test:"
+    print newSum
+    putStrLn ""
 
-    runTestsWithMutants filePath ms projectPath
+    runTestsWithMutants filePath ms projectPath newSum
+
+testResHandler :: TestSummary -> (ExitCode, String, String) -> IO TestSummary
+testResHandler testSum (ExitSuccess, _, _) = return (incSucc testSum)
+testResHandler testSum (ExitFailure c, stdout, stderr) = 
+    if null stderr
+        then do putStrLn $ "Test failed: "
+                putStrLn stdout
+                return (incFail testSum)
+        else do putStrLn $ "Test threw an ERROR: "
+                putStrLn stderr
+                return (incErr testSum)
 
 
 -- | Tries to run the mutation process on all files at the input directory, 
