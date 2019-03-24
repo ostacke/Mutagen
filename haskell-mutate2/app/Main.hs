@@ -97,7 +97,6 @@ backupOriginal :: FilePath -> FilePath -> IO ()
 backupOriginal originalFile backupDir = do
     let backupFilePath = backupDir </> takeFileName originalFile
     createDirectoryIfMissing False backupDir
-    putStrLn ""
     putStrLn "Backing up original source file..."
     putStrLn $ "From: " ++ originalFile
     putStrLn $ "To:   " ++ backupFilePath
@@ -108,7 +107,6 @@ backupOriginal originalFile backupDir = do
 restoreOriginal :: FilePath -> FilePath -> IO ()
 restoreOriginal backupDir originalFile = do
     let backupFile = backupDir </> takeFileName originalFile
-    putStrLn ""
     putStrLn "Restoring original file..."
     putStrLn $ "From: " ++ show backupFile
     putStrLn $ "To:   " ++ show originalFile
@@ -133,30 +131,39 @@ runTestsWithMutants :: FilePath             -- ^ Path to source file to mutate.
                     -> IO TestSummary       -- ^ Result summary of test runs.
 runTestsWithMutants _ [] _ testSum = return testSum
 runTestsWithMutants filePath (m:ms) projectPath testSum = do
-    -- Remove old file and write mutant to file
-    removeFile filePath
-    writeFile filePath (prettyPrint m)
+    -- Remove old file and write mutant to file.
+    insertMutant
 
-    putStrLn "Attempting to run 'cabal test' with the follwing mutant: "
-    putStrLn $ prettyPrint m
-    putStrLn ""
+    -- Display which mutant that is currently being used.
+    showMutant
 
-    -- Run cabal test with the new mutant
+    -- Run tests with a process, reading its exit code and updating the 
+    -- summary accordingly.
     setCurrentDirectory projectPath
     newSum <- testResHandler testSum =<< readProcessWithExitCode "cabal" ["test"] ""
 
     runTestsWithMutants filePath ms projectPath newSum
 
+    where insertMutant = do removeFile filePath
+                            writeFile filePath (prettyPrint m)
+          showMutant = do putStrLn "==> Running tests with the follwing mutant: "
+                          putStrLn (prettyPrint m)
+                          putStrLn ""
+
 testResHandler :: TestSummary -> (ExitCode, String, String) -> IO TestSummary
-testResHandler testSum (ExitSuccess, _, _) = return (incSucc testSum)
-testResHandler testSum (ExitFailure c, stdout, stderr) = 
-    if null stderr
-        then do putStrLn $ "Test failed: "
-                putStrLn stdout
-                return (incFail testSum)
-        else do putStrLn $ "Test threw an ERROR: "
+-- If testing was successful
+testResHandler testSum (ExitSuccess, _, _) = do
+    putStrLn "Testing succeeded; mutant SURVIVED.\n"
+    return $ incSucc testSum
+
+-- If testing failed or returned an error
+testResHandler testSum (ExitFailure c, stdout, stderr) =
+    if null stderr 
+        then do putStrLn "Testing failed; mutant was KILLED.\n"
+                return $ incFail testSum
+        else do putStrLn "Testing returned an ERROR:\n"
                 putStrLn stderr
-                return (incErr testSum)
+                return $ incErr testSum
 
 
 -- | Tries to run the mutation process on all files at the input directory, 
@@ -195,7 +202,7 @@ launchAtDir inputDir outputDir = do
 
 
 -- | Attemps to parse a module at the given file path, returning the 
---   mutation results if successful.
+--   mutation results if successful. Otherwise prints the error message.
 mutateFile :: FilePath -> IO [Module SrcSpanInfo]
 mutateFile [] = return []
 mutateFile path = do
@@ -203,14 +210,15 @@ mutateFile path = do
 
     case parseRes of
         ParseOk syntaxTree -> return $ safeMutate syntaxTree
+        ParseFailed l errMsg -> showParsingError
 
-        ParseFailed l errMsg -> do
-            putStrLn "PARSING FAILED:"
-            putStrLn ""
-            putStrLn errMsg
-            putStrLn ""
-            return []
-    
+            where showParsingError = do
+                    putStrLn "PARSING FAILED:"
+                    putStrLn ""
+                    putStrLn errMsg
+                    putStrLn ""
+                    return []
+
     
 -- | Invokes combineMutants' with intended first parameter.
 combineMutants :: [[Module SrcSpanInfo]] -> [[[Module SrcSpanInfo]]]
