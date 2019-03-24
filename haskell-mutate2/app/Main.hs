@@ -64,14 +64,24 @@ launchAtProject fPath pPath = do
     createDirectoryIfMissing False backupDir
     
     -- Copy file to backup at new backup path
+    putStrLn "Backing up original file..."
     withCurrentDirectory backupDir $ copyFile filePath (backupDir </> takeFileName filePath)
 
     -- Get mutations of target file
+    putStrLn "Creating mutants..."
     mutantModules <- mutateFile filePath
     putStrLn $ (show $ length mutantModules) ++ " mutants created."
 
     -- Run tests with mutants
     runTestsWithMutants filePath mutantModules projectPath
+
+    -- Restore original file from backup
+    putStrLn "Restoring original file from backup..."
+    copyFile (backupDir </> takeFileName filePath) filePath
+
+    -- Print information
+    putStrLn $ "In total, " ++ (show $ length mutantModules) 
+               ++ " mutants were created."
 
     return ()
     
