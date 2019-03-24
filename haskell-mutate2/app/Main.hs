@@ -33,7 +33,9 @@ main = do
 
     case args of
         "--help"       : _  -> showUsage
-        "--input-file" : xs -> launchAtProject (head xs) (getProjectDir $ tail xs)
+        "--input-file" : xs -> do fPath <- makeAbsolute $ head xs
+                                  pPath <- makeAbsolute $ getProjectDir $ tail xs
+                                  launchAtProject fPath pPath
         "--input-dir"  : xs -> launchAtDir (head xs) (getOutputDir $ tail xs)
 
         _ -> showUsage
@@ -67,35 +69,52 @@ showUsage = do
 
 
 
-launchAtProject :: FilePath -> FilePath -> IO ()
-launchAtProject fPath pPath = do
-    projectPath <- makeAbsolute pPath
-    filePath <- makeAbsolute fPath
-    projContents <- getAbsoluteDirContents projectPath
+launchAtProject :: FilePath -- ^ Path to file to be mutated
+                -> FilePath -- ^ Path to project directory
+                -> IO ()
+launchAtProject filePath projectPath = do
+    -- Back up original file to backup directory, creating the backup
+    -- directory if not already existing.
+    backupOriginal filePath backupDir
 
-    -- Create folder to put backup of original source file
-    let backupDir = projectPath </> "backups"
-    createDirectoryIfMissing False backupDir
-    
-    -- Copy file to backup at new backup path
-    putStrLn "Backing up original file..."
-    withCurrentDirectory backupDir $ copyFile filePath (backupDir </> takeFileName filePath)
-
-    -- Get mutations of target file
-    putStrLn "Creating mutants..."
+    -- Create mutated ASTs of target file
     mutantModules <- mutateFile filePath
-    putStrLn $ (show $ length mutantModules) ++ " mutants created."
 
     -- Run tests with mutants
     testSummary <- runTestsWithMutants filePath mutantModules projectPath (TestSummary 0 0 0)
 
     -- Restore original file from backup
-    putStrLn "Restoring original file from backup..."
-    copyFile (backupDir </> takeFileName filePath) filePath
-    putStrLn ""
+    restoreOriginal backupDir filePath
 
     -- Print information
     printResults testSummary
+    
+    where backupDir = projectPath </> "backups"
+
+
+-- Functions for backing up original files and restoring them from backup.
+backupOriginal :: FilePath -> FilePath -> IO ()
+backupOriginal originalFile backupDir = do
+    let backupFilePath = backupDir </> takeFileName originalFile
+    createDirectoryIfMissing False backupDir
+    putStrLn ""
+    putStrLn "Backing up original source file..."
+    putStrLn $ "From: " ++ originalFile
+    putStrLn $ "To:   " ++ backupFilePath
+    withCurrentDirectory backupDir $ copyFile originalFile backupFilePath
+    putStrLn $ "Backup created successfully."
+    putStrLn ""
+
+restoreOriginal :: FilePath -> FilePath -> IO ()
+restoreOriginal backupDir originalFile = do
+    let backupFile = backupDir </> takeFileName originalFile
+    putStrLn ""
+    putStrLn "Restoring original file..."
+    putStrLn $ "From: " ++ show backupFile
+    putStrLn $ "To:   " ++ show originalFile
+    copyFile backupFile originalFile
+    putStrLn $ "Successfully restored original file."
+    putStrLn ""
 
 
 printResults :: TestSummary -> IO ()
@@ -183,9 +202,7 @@ mutateFile path = do
     parseRes <- parseFile path
 
     case parseRes of
-        ParseOk syntaxTree -> do
-            let mutantTrees = safeMutate syntaxTree
-            return mutantTrees
+        ParseOk syntaxTree -> return $ safeMutate syntaxTree
 
         ParseFailed l errMsg -> do
             putStrLn "PARSING FAILED:"
