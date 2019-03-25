@@ -14,6 +14,7 @@ import System.IO.Error
 import Text.Pretty.Simple
 
 import Mutate
+import Path
 
 data TestSummary = TestSummary
     { successful :: Int -- ^ Number of tests that were successfully run and passed.
@@ -361,12 +362,4 @@ getModulePath mod = case mod of
     Module (SrcSpanInfo (SrcSpan fileName _ _ _ _) _) _ _ _ _ -> Just fileName
     _ -> Nothing
 
-
--- | Given a path to a directory, returns a list of the absolute paths for 
---   every file at the directory.
-getAbsoluteDirContents :: FilePath -> IO [FilePath]
-getAbsoluteDirContents dir = do
-    contents <- listDirectory dir
-    let relativePaths = map (dir </>) contents
-    mapM canonicalizePath relativePaths
 
