@@ -102,7 +102,7 @@ instance Mutable (Decl a) where
         DataFamDecl l context declHead resultSig -> [] --TODO
         TypeInsDecl l typ1 typ2 -> [] --TODO
         DataInsDecl l dataOrNew typ qualConDecl derivin -> [] --TODO
-        GDataInsDecl l dataOrNew typ qualConDecl derivin .> [] --TODO
+        GDataInsDecl l dataOrNew typ kind gadtDecl derivin -> [] --TODO
         ClassDecl l context declHead funDep classDecl -> [] --TODO
         InstDecl l overlap instRule instDecl -> [] --TODO
         DerivDecl l derivStrategy overlap instRule -> [] --TODO
@@ -110,7 +110,7 @@ instance Mutable (Decl a) where
         DefaultDecl l typ -> [] --TODO
         SpliceDecl l exp -> [] --TODO
         TypeSig l name typ -> [] --TODO
-        PatSynSig l name tyVarBind context tyVarBind context typ -> [] --TODO
+        --PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> [] --TODO
         FunBind l match -> [] --TODO
         PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
         PatSyn l pat1 pat2 patternSynDirection -> [] --TODO
@@ -127,7 +127,8 @@ instance Mutable (Decl a) where
         AnnPragma l booleanFormula -> [] --TODO
         MinimalPragma l booleanFormula -> [] --TODO
         RoleAnnotDecl l qName role -> [] --TODO
-        completePragma l name qName -> [] --TODO
+        CompletePragma l name qName -> [] --TODO
+        _ -> []
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
