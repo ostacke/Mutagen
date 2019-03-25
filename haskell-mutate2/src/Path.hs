@@ -1,4 +1,7 @@
-module Path where
+module Path 
+    ( srcDirFromProject
+    , getAbsoluteDirContents
+    ) where
 
 import Data.Char
 import Data.List
@@ -6,14 +9,14 @@ import Data.Maybe
 import System.Directory
 import System.FilePath
 
+
 -- | Given the path to a directory containing a .cabal file,
 --   returns the source directory for the library modules.
 srcDirFromProject :: FilePath -> IO FilePath
 srcDirFromProject projectDir = do
     cabalContents <- readFile =<< cabalPathFromProject projectDir
-    let src = srcDirFromCabal cabalContents 
-    
-    return $ projectDir </> src
+    return $ projectDir </> srcDirFromCabal cabalContents
+
 
 -- | Given a path to a directory, returns the path to the .cabal file
 --   Throws an exception in the fromJust otherwise.
@@ -23,8 +26,8 @@ cabalPathFromProject projectDir = do
     return $ fromJust $ find (\x -> takeExtension x == ".cabal") contents
 
 
--- | Given the contents of a .cabal file, returns the name of the 
---   "hs-source-dirs" field (the src directory).
+-- Given the contents of a .cabal file, returns the name of the 
+-- "hs-source-dirs" field (the src directory).
 srcDirFromCabal :: String -> String
 srcDirFromCabal contents = findLibrary $ lines contents
 findLibrary [] = "src"
@@ -45,5 +48,4 @@ getAbsoluteDirContents dir = do
     contents <- listDirectory dir
     let relativePaths = map (dir </>) contents
     mapM canonicalizePath relativePaths
-
 
