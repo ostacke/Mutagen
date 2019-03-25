@@ -110,7 +110,7 @@ instance Mutable (Decl a) where
         DefaultDecl l typ -> [] --TODO
         SpliceDecl l exp -> [] --TODO
         TypeSig l name typ -> [] --TODO
-        --PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> [] --TODO
+        PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> [] --TODO
         FunBind l match -> [] --TODO
         PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
         PatSyn l pat1 pat2 patternSynDirection -> [] --TODO
