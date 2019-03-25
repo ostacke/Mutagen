@@ -15,6 +15,7 @@ import Text.Pretty.Simple
 
 import Mutate
 import Path
+import FileOp
 
 data TestSummary = TestSummary
     { successful :: Int -- ^ Number of tests that were successfully run and passed.
@@ -43,10 +44,7 @@ main = do
 
     case args of
         "--help"       : _  -> showUsage
-        "--input-file" : xs -> do fPath <- makeAbsolute $ head xs
-                                  pPath <- makeAbsolute $ getProjectDir $ tail xs
-                                  launchAtProject fPath pPath
-        "--input-dir"  : xs -> launchAtDir (head xs) (getOutputDir $ tail xs)
+        "--project-dir": xs -> launchAtProject $ head xs
 
         _ -> showUsage
 
@@ -70,21 +68,20 @@ showUsage = do
     putStrLn "Usage: haskell-mutate2-exe [OPTION]..."
     putStrLn "--help                    Shows this text."
     putStrLn "--input-file FILE         Specifies input file to mutate."
-    putStrLn "--input-dir DIRECTORY     Specifies location of files to mutate."
-    putStrLn "--output-dir DIRECTORY    Specifies output location of result."
-    putStrLn "                          Defaults to ./out."
     putStrLn "--project-dir DIRECTORY   Specifies directory of cabal project."
     putStrLn "                          Should contain a .cabal file and "
-    putStrLn "                          defaults to ./"
+    putStrLn "                          defaults to ./ if not specified"
 
 
 
-launchAtProject :: FilePath -- ^ Path to file to be mutated
-                -> FilePath -- ^ Path to project directory
+launchAtProject :: FilePath -- ^ Path to project directory
                 -> IO ()
-launchAtProject filePath projectPath = do
+launchAtProject projectPath = do
     -- Clean old output folder
     wipeDirIfExists outputDir
+
+    -- Get absolute file paths to all files in the source folder
+    srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
 
     -- Back up original file to backup directory, creating the backup
     -- directory if not already existing.
@@ -106,14 +103,7 @@ launchAtProject filePath projectPath = do
           outputDir = projectPath </> outputSuffix
 
 
--- | Deletes directory (recursively) if it exists and replaces it with a new,
---   empty directory. Creates a new directory if it does not exist.
-wipeDirIfExists :: FilePath -> IO ()
-wipeDirIfExists dir = do
-    exists <- doesDirectoryExist dir
-    if exists then do removeDirectoryRecursive dir
-                      createDirectory dir
-              else createDirectory dir
+
 
 
 -- Functions for backing up original files and restoring them from backup.
