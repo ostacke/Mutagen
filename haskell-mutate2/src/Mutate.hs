@@ -105,7 +105,8 @@ instance Mutable (Decl a) where
         DataInsDecl l dataOrNew typ qualConDecl derivin -> []
         GDataInsDecl l dataOrNew typ kind gadtDecl derivin -> []
         ClassDecl l context declHead funDep classDecl -> []
-        InstDecl l overlap instRule instDecl -> [] --TODO kanske mutera?
+        InstDecl l overlap instRule instDecl
+            -> m3 (InstDecl l) overlap instRule instDecl
         DerivDecl l derivStrategy overlap instRule -> []
         InfixDecl l assoc int op
             -> mutantsA ++ mutantsB
@@ -139,8 +140,8 @@ instance Mutable (Decl a) where
 {- Det här borde man kunna göra snyggare..
 -}
 instance Mutable (Assoc a) where
-    mutate (AssocNone a) = [AssocNone a, AssocLeft a, AssocRight a]
-    mutate (AssocLeft a) = [AssocNone a, AssocLeft a, AssocRight a]
+    mutate (AssocNone a)  = [AssocNone a, AssocLeft a, AssocRight a]
+    mutate (AssocLeft a)  = [AssocNone a, AssocLeft a, AssocRight a]
     mutate (AssocRight a) = [AssocNone a, AssocLeft a, AssocRight a]
 
 instance Mutable (Op a) where
@@ -148,6 +149,22 @@ instance Mutable (Op a) where
 
 instance Mutable Int where
     mutate n = [0, 1, n+1, n-1, n*(-1)]
+
+{- Borde inte muteras
+-}
+instance Mutable (Overlap a) where
+    mutate _ = []
+
+{- Borde inte muteras
+-}
+instance Mutable (InstRule a) where
+    mutate _ = []
+
+instance Mutable (InstDecl a) where
+    mutate instDecl = case instDecl of    
+        InsDecl a decl -> m1 (InsDecl a) decl
+        -- TODO
+        _ -> []
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
