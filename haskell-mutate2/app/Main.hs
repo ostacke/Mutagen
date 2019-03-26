@@ -13,29 +13,15 @@ import System.IO
 import System.IO.Error
 import Text.Pretty.Simple
 
+import FileOp
+import Results
 import Mutate
 import Path
-import FileOp
-
-data TestSummary = TestSummary
-    { successful :: Int -- ^ Number of tests that were successfully run and passed.
-    , failed     :: Int -- ^ Number of tests that ran but failed.
-    , errors     :: Int -- ^ Number of errors, e.g. compilation errors.
-    } deriving (Show)
-
--- | Data type representing how a mutant fared during a test suite, along with
---   the output of stdout or stderr, depending on the result.
-data TestResult = Survived String   -- ^ Mutant survived the tests, stdout
-                | Killed String     -- ^ Tests killed the mutant, stdout
-                | Error String      -- ^ Tests threw an exception, stderr
-
-incSucc (TestSummary s f e) = TestSummary (s + 1) f e
-incFail (TestSummary s f e) = TestSummary s (f + 1) e
-incErr  (TestSummary s f e) = TestSummary s f (e + 1)
 
 
 outputSuffix = "mutants-out"
 backupSuffix = "backups"
+emptyRes = ResultSummary 0 0 0
 
 
 main :: IO ()
@@ -73,7 +59,6 @@ showUsage = do
     putStrLn "                          defaults to ./ if not specified"
 
 
-
 launchAtProject :: FilePath -- ^ Path to project directory
                 -> IO ()
 launchAtProject projectPath = do
@@ -83,27 +68,37 @@ launchAtProject projectPath = do
     -- Get absolute file paths to all files in the source folder
     srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
 
-    -- Back up original file to backup directory, creating the backup
-    -- directory if not already existing.
-    backupOriginal filePath backupDir
-
-    -- Create mutated ASTs of target file
-    mutantModules <- mutateFile filePath
-
-    -- Run tests with mutants
-    testSummary <- runTestsWithMutants filePath mutantModules projectPath (TestSummary 0 0 0)
-
-    -- Restore original file from backup
-    restoreOriginal backupDir filePath
+    rs <- mapM (flip runRoutine projectPath) srcFiles
+    let resultSummary = foldl (|+|) emptyRes rs
 
     -- Print summary of test runs
-    printResults testSummary
+    printResults resultSummary
     
     where backupDir = projectPath </> backupSuffix
           outputDir = projectPath </> outputSuffix
 
+-- | Given a path to a file, project, and a TestSummary, runs the process of 
+--   backing up the original file, mutating it, testing it, and restoring the 
+--   original file back. Then returns the updated TestSummary.
+runRoutine :: FilePath -> FilePath -> IO ResultSummary
+runRoutine filePath projectPath = do
+    -- Back up the original file to the backup directory, creating the backup
+    -- directory if not already existing.
+    backupOriginal filePath backupDir
 
+    -- Create mutated ASTs of the target file.
+    mutantModules <- mutateFile filePath
 
+    -- Run the tests with the mutant, return the results from the test
+    testSummary <- runTestsWithMutants filePath mutantModules projectPath emptyRes
+
+    -- Restore the original file from the backup location
+    restoreOriginal backupDir filePath
+
+    return testSummary
+
+    where backupDir = projectPath </> backupSuffix
+          outputDir = projectPath </> outputSuffix
 
 
 -- Functions for backing up original files and restoring them from backup.
@@ -129,11 +124,11 @@ restoreOriginal backupDir originalFile = do
     putStrLn ""
 
 
-printResults :: TestSummary -> IO ()
-printResults (TestSummary s f e) = do
+printResults :: ResultSummary -> IO ()
+printResults (ResultSummary s k e) = do
     putStrLn ":: SUMMARY ::"
-    putStrLn $ "In total, " ++ show (s + f + e) ++ " mutants were created."
-    putStrLn $ "Number of mutants killed: " ++ show f
+    putStrLn $ "In total, " ++ show (s + k + e) ++ " mutants were created."
+    putStrLn $ "Number of mutants killed: " ++ show k
     putStrLn $ "Number of mutants that survived: " ++ show s
     putStrLn $ "Number of errors: " ++ show e
 
@@ -141,8 +136,8 @@ printResults (TestSummary s f e) = do
 runTestsWithMutants :: FilePath             -- ^ Path to source file to mutate.
                     -> [Module SrcSpanInfo] -- ^ List of mutant ASTs.
                     -> FilePath             -- ^ Path to project directory.
-                    -> TestSummary
-                    -> IO TestSummary       -- ^ Result summary of test runs.
+                    -> ResultSummary
+                    -> IO ResultSummary     -- ^ Result summary of test runs.
 runTestsWithMutants _ [] _ testSum = return testSum
 runTestsWithMutants filePath (m:ms) projectPath testSum = do
     -- Remove old file and write mutant to file.
@@ -173,11 +168,11 @@ getTestResult (ExitFailure exitCode, stdout, stderr)
     | otherwise = Error stderr
 
 
-updateSummary :: TestSummary -> TestResult -> TestSummary
+updateSummary :: ResultSummary -> TestResult -> ResultSummary
 updateSummary summary res = case res of
-    Survived _ -> incSucc summary
-    Killed _   -> incFail summary
-    Error _    -> incErr summary
+    Survived _ -> incSurvived summary
+    Killed _   -> incKilled summary
+    Error _    -> incError summary
 
 
 -- | Performs actions depending on the given TestResult:
