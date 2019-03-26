@@ -105,10 +105,15 @@ instance Mutable (Decl a) where
         DataInsDecl l dataOrNew typ qualConDecl derivin -> []
         GDataInsDecl l dataOrNew typ kind gadtDecl derivin -> []
         ClassDecl l context declHead funDep classDecl -> []
-        InstDecl l overlap instRule instDecl -> []
+        InstDecl l overlap instRule instDecl -> [] --TODO kanske mutera?
         DerivDecl l derivStrategy overlap instRule -> []
-        InfixDecl l assoc int op -> m3 (InfixDecl l) assoc int op
-        DefaultDecl l typ -> []
+        InfixDecl l assoc int op
+            -> mutantsA ++ mutantsB
+                where
+                mutantsA = map(\x -> InfixDecl l x int op) (mutate assoc)
+                mutantsB = map(\x -> InfixDecl l assoc x op) (precMutate)
+                precMutate = map Just [0..9]
+        DefaultDecl l typ -> [] --TODO ???
         SpliceDecl l exp -> [] --TODO, vad är en splice?
         TypeSig l name typ -> []
         PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> []
@@ -131,14 +136,18 @@ instance Mutable (Decl a) where
         CompletePragma l name qName -> []
         _ -> []
 
+{- Det här borde man kunna göra snyggare..
+-}
 instance Mutable (Assoc a) where
-    mutate _ = []
+    mutate (AssocNone a) = [AssocNone a, AssocLeft a, AssocRight a]
+    mutate (AssocLeft a) = [AssocNone a, AssocLeft a, AssocRight a]
+    mutate (AssocRight a) = [AssocNone a, AssocLeft a, AssocRight a]
 
 instance Mutable (Op a) where
     mutate _ = []
 
 instance Mutable Int where
-    mutate _ = []
+    mutate n = [0, 1, n+1, n-1, n*(-1)]
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
