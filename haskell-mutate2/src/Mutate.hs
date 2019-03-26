@@ -91,8 +91,7 @@ instance Mutable (ImportDecl a) where
 
 {-  Decl is the top level of all the declarations and functions
     in a Haskell file.
-    Not mutated: Type or data declarations, instances, type classes,
-        deriving delarations
+    Mutated: Operator fixity, function binding clauses and pattern bindings
 -}
 instance Mutable (Decl a) where
     mutate decl = case decl of
@@ -113,24 +112,33 @@ instance Mutable (Decl a) where
         SpliceDecl l exp -> [] --TODO, vad är en splice?
         TypeSig l name typ -> []
         PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> []
-        FunBind l match -> m2 (FunBind l) match
+        FunBind l match -> m1 (FunBind l) match
         PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
-        PatSyn l pat1 pat2 patternSynDirection -> [] --TODOi, vad är skillnaden mellan en pattern synonym och en pattern synonym signaturedeclaration
-        ForImp l callConv safety string name typ -> [] --TODO
-        ForExp l callConv string name typ -> [] --TODO
-        RulePragmaDecl l rule -> [] --TODO
-        DeprPragmaDecl l nameString -> [] --TODO
-        WarnPragmaDecl l nameString -> [] --TODO
-        InlineSig l bool activation qName -> [] --TODO
-        InlineConlikeSig l activation qName -> [] --TODO
-        SpecSig l activation qName typ -> [] --TODO
-        SpecInlineSig l bool activation qName typ -> [] --TODO
-        InstSig l instRule -> [] --TODO
-        AnnPragma l booleanFormula -> [] --TODO
-        MinimalPragma l booleanFormula -> [] --TODO
-        RoleAnnotDecl l qName role -> [] --TODO
-        CompletePragma l name qName -> [] --TODO
+        PatSyn l pat1 pat2 patternSynDirection -> [] --TODO, vad är skillnaden mellan en pattern synonym och en pattern synonym signature declaration?
+        ForImp l callConv safety string name typ -> []
+        ForExp l callConv string name typ -> []
+        RulePragmaDecl l rule -> []
+        DeprPragmaDecl l nameString -> []
+        WarnPragmaDecl l nameString -> []
+        InlineSig l bool activation qName -> []
+        InlineConlikeSig l activation qName -> []
+        SpecSig l activation qName typ -> []
+        SpecInlineSig l bool activation qName typ -> []
+        InstSig l instRule -> []
+        AnnPragma l booleanFormula -> []
+        MinimalPragma l booleanFormula -> []
+        RoleAnnotDecl l qName role -> []
+        CompletePragma l name qName -> []
         _ -> []
+
+instance Mutable (Assoc a) where
+    mutate _ = []
+
+instance Mutable (Op a) where
+    mutate _ = []
+
+instance Mutable Int where
+    mutate _ = []
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
