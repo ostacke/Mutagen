@@ -91,29 +91,31 @@ instance Mutable (ImportDecl a) where
 
 {-  Decl is the top level of all the declarations and functions
     in a Haskell file.
+    Not mutated: Type or data declarations, instances, type classes,
+        deriving delarations
 -}
 instance Mutable (Decl a) where
     mutate decl = case decl of
-        TypeDecl l declHead typ -> [] --TODO
-        TypeFamDecl l declHead resultSig injectivityInfo -> [] --TODO
-        ClosedTypeFamDecl l declHead resultSig injectivityInfo typeEqn -> [] --TODO
-        DataDecl l dataOrNew context declHead qualConDecl derivin -> [] --TODO
-        GDataDecl l dataOrNew context declHead kind gadtDecl derivin -> [] --TODO
-        DataFamDecl l context declHead resultSig -> [] --TODO
-        TypeInsDecl l typ1 typ2 -> [] --TODO
-        DataInsDecl l dataOrNew typ qualConDecl derivin -> [] --TODO
-        GDataInsDecl l dataOrNew typ kind gadtDecl derivin -> [] --TODO
-        ClassDecl l context declHead funDep classDecl -> [] --TODO
-        InstDecl l overlap instRule instDecl -> [] --TODO
-        DerivDecl l derivStrategy overlap instRule -> [] --TODO
-        InfixDecl l assoc int op -> [] --TODO
-        DefaultDecl l typ -> [] --TODO
-        SpliceDecl l exp -> [] --TODO
-        TypeSig l name typ -> [] --TODO
-        PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> [] --TODO
-        FunBind l match -> [] --TODO
+        TypeDecl l declHead typ -> []
+        TypeFamDecl l declHead resultSig injectivityInfo -> []
+        ClosedTypeFamDecl l declHead resultSig injectivityInfo typeEqn -> []
+        DataDecl l dataOrNew context declHead qualConDecl derivin -> []
+        GDataDecl l dataOrNew context declHead kind gadtDecl derivin -> []
+        DataFamDecl l context declHead resultSig -> []
+        TypeInsDecl l typ1 typ2 -> []
+        DataInsDecl l dataOrNew typ qualConDecl derivin -> []
+        GDataInsDecl l dataOrNew typ kind gadtDecl derivin -> []
+        ClassDecl l context declHead funDep classDecl -> []
+        InstDecl l overlap instRule instDecl -> []
+        DerivDecl l derivStrategy overlap instRule -> []
+        InfixDecl l assoc int op -> m3 (InfixDecl l) assoc int op
+        DefaultDecl l typ -> []
+        SpliceDecl l exp -> [] --TODO, vad är en splice?
+        TypeSig l name typ -> []
+        PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> []
+        FunBind l match -> m2 (FunBind l) match
         PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
-        PatSyn l pat1 pat2 patternSynDirection -> [] --TODO
+        PatSyn l pat1 pat2 patternSynDirection -> [] --TODOi, vad är skillnaden mellan en pattern synonym och en pattern synonym signaturedeclaration
         ForImp l callConv safety string name typ -> [] --TODO
         ForExp l callConv string name typ -> [] --TODO
         RulePragmaDecl l rule -> [] --TODO
