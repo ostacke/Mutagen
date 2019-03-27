@@ -114,8 +114,9 @@ instance Mutable (Decl a) where
                 mutantsA = map(\x -> InfixDecl l x int op) (mutate assoc)
                 mutantsB = map(\x -> InfixDecl l assoc x op) (precMutate)
                 precMutate = map Just [0..9]
-        DefaultDecl l typ -> [] --TODO ???
-        SpliceDecl l exp -> [] --TODO, vad är en splice?
+        DefaultDecl l typ -> []
+        SpliceDecl l exp
+            -> m1 (SpliceDecl l) exp
         TypeSig l name typ -> []
         PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> []
         FunBind l match -> m1 (FunBind l) match
@@ -140,9 +141,9 @@ instance Mutable (Decl a) where
 {- Det här borde man kunna göra snyggare..
 -}
 instance Mutable (Assoc a) where
-    mutate (AssocNone a)  = [AssocNone a, AssocLeft a, AssocRight a]
-    mutate (AssocLeft a)  = [AssocNone a, AssocLeft a, AssocRight a]
-    mutate (AssocRight a) = [AssocNone a, AssocLeft a, AssocRight a]
+    mutate (AssocNone l)  = [AssocNone l, AssocLeft l, AssocRight l]
+    mutate (AssocLeft l)  = [AssocNone l, AssocLeft l, AssocRight l]
+    mutate (AssocRight l) = [AssocNone l, AssocLeft l, AssocRight l]
 
 instance Mutable (Op a) where
     mutate _ = []
@@ -162,9 +163,13 @@ instance Mutable (InstRule a) where
 
 instance Mutable (InstDecl a) where
     mutate instDecl = case instDecl of    
-        InsDecl a decl -> m1 (InsDecl a) decl
-        -- TODO
+        InsDecl l decl -> m1 (InsDecl l) decl
         _ -> []
+
+{- TODO
+-}
+instance Mutable (Alt a) where
+    mutate _ -> []
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
@@ -176,6 +181,8 @@ instance Mutable (Rhs a) where
 instance Mutable (GuardedRhs a) where
     mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
 
+{- TODO
+-}
 instance Mutable (Stmt a) where
     mutate _ = []
 
@@ -198,12 +205,6 @@ instance Mutable (Name a) where
 instance Mutable (Pat a) where
     mutate pat = case pat of
         _ -> []
-
-instance Mutable (Exp a) where
-    mutate (InfixApp l e1 qOp e2)       = m3 (InfixApp l) e1 qOp e2
-    mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
-    mutate (Lit l literal)              = m1 (Lit l) literal
-    mutate rest = []
 
 instance Mutable (QOp a) where
     mutate (QVarOp l qName) = m1 (QVarOp l) qName
