@@ -1,5 +1,7 @@
 module FileOp
     ( wipeDirIfExists
+    , backupOriginal
+    , restoreOriginal
     ) where
 
 import System.Directory
@@ -13,3 +15,26 @@ wipeDirIfExists dir = do
     if exists then do removeDirectoryRecursive dir
                       createDirectory dir
               else createDirectory dir
+
+
+-- | Functions for backing up original files and restoring them from backup.
+backupOriginal :: FilePath -> FilePath -> IO ()
+backupOriginal originalFile backupDir = do
+    let backupFilePath = backupDir </> takeFileName originalFile
+    createDirectoryIfMissing False backupDir
+    putStrLn "Backing up original source file..."
+    putStrLn $ "From: " ++ originalFile
+    putStrLn $ "To:   " ++ backupFilePath
+    withCurrentDirectory backupDir $ copyFile originalFile backupFilePath
+    putStrLn $ "Backup created successfully."
+    putStrLn ""
+
+restoreOriginal :: FilePath -> FilePath -> IO ()
+restoreOriginal backupDir originalFile = do
+    let backupFile = backupDir </> takeFileName originalFile
+    putStrLn "Restoring original file..."
+    putStrLn $ "From: " ++ show backupFile
+    putStrLn $ "To:   " ++ show originalFile
+    copyFile backupFile originalFile
+    putStrLn $ "Successfully restored original file."
+    putStrLn ""

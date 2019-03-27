@@ -77,6 +77,7 @@ launchAtProject projectPath = do
     where backupDir = projectPath </> backupSuffix
           outputDir = projectPath </> outputSuffix
 
+
 -- | Given a path to a file, project, and a TestSummary, runs the process of 
 --   backing up the original file, mutating it, testing it, and restoring the 
 --   original file back. Then returns the updated TestSummary.
@@ -99,38 +100,6 @@ runRoutine filePath projectPath = do
 
     where backupDir = projectPath </> backupSuffix
           outputDir = projectPath </> outputSuffix
-
-
--- Functions for backing up original files and restoring them from backup.
-backupOriginal :: FilePath -> FilePath -> IO ()
-backupOriginal originalFile backupDir = do
-    let backupFilePath = backupDir </> takeFileName originalFile
-    createDirectoryIfMissing False backupDir
-    putStrLn "Backing up original source file..."
-    putStrLn $ "From: " ++ originalFile
-    putStrLn $ "To:   " ++ backupFilePath
-    withCurrentDirectory backupDir $ copyFile originalFile backupFilePath
-    putStrLn $ "Backup created successfully."
-    putStrLn ""
-
-restoreOriginal :: FilePath -> FilePath -> IO ()
-restoreOriginal backupDir originalFile = do
-    let backupFile = backupDir </> takeFileName originalFile
-    putStrLn "Restoring original file..."
-    putStrLn $ "From: " ++ show backupFile
-    putStrLn $ "To:   " ++ show originalFile
-    copyFile backupFile originalFile
-    putStrLn $ "Successfully restored original file."
-    putStrLn ""
-
-
-printResults :: ResultSummary -> IO ()
-printResults (ResultSummary s k e) = do
-    putStrLn ":: SUMMARY ::"
-    putStrLn $ "In total, " ++ show (s + k + e) ++ " mutants were created."
-    putStrLn $ "Number of mutants killed: " ++ show k
-    putStrLn $ "Number of mutants that survived: " ++ show s
-    putStrLn $ "Number of errors: " ++ show e
 
 
 runTestsWithMutants :: FilePath             -- ^ Path to source file to mutate.
@@ -159,20 +128,6 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
 
     where insertMutant = do removeFile filePath
                             writeFile filePath (prettyPrint m)
-
-
-getTestResult :: (ExitCode, String, String) -> TestResult
-getTestResult (ExitSuccess, stdout, _) = Survived stdout
-getTestResult (ExitFailure exitCode, stdout, stderr)
-    | null stderr = Killed stdout
-    | otherwise = Error stderr
-
-
-updateSummary :: ResultSummary -> TestResult -> ResultSummary
-updateSummary summary res = case res of
-    Survived _ -> incSurvived summary
-    Killed _   -> incKilled summary
-    Error _    -> incError summary
 
 
 -- | Performs actions depending on the given TestResult:

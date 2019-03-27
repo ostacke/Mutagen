@@ -1,5 +1,7 @@
 module Results where
 
+import System.Exit
+
 data ResultSummary = ResultSummary
     { survived :: Int -- ^ Number of mutants that survived tests.
     , killed   :: Int -- ^ Number of mutants that were killed by tests.
@@ -20,5 +22,24 @@ incError  (ResultSummary s f e) = ResultSummary s f (e + 1)
 (ResultSummary s1 k1 e1) |+| (ResultSummary s2 k2 e2) =
     ResultSummary (s1 + s2) (k1 + k2) (e1 + e2)
 
-    
-    
+printResults :: ResultSummary -> IO ()
+printResults (ResultSummary s k e) = do
+    putStrLn ":: SUMMARY ::"
+    putStrLn $ "In total, " ++ show (s + k + e) ++ " mutants were created."
+    putStrLn $ "Number of mutants killed: " ++ show k
+    putStrLn $ "Number of mutants that survived: " ++ show s
+    putStrLn $ "Number of errors: " ++ show e
+
+
+getTestResult :: (ExitCode, String, String) -> TestResult
+getTestResult (ExitSuccess, stdout, _) = Survived stdout
+getTestResult (ExitFailure exitCode, stdout, stderr)
+    | null stderr = Killed stdout
+    | otherwise = Error stderr
+
+
+updateSummary :: ResultSummary -> TestResult -> ResultSummary
+updateSummary summary res = case res of
+    Survived _ -> incSurvived summary
+    Killed _   -> incKilled summary
+    Error _    -> incError summary
