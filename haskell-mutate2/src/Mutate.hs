@@ -169,7 +169,7 @@ instance Mutable (InstDecl a) where
 {- TODO
 -}
 instance Mutable (Alt a) where
-    mutate _ -> []
+    mutate _ = []
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
@@ -205,6 +205,13 @@ instance Mutable (Name a) where
 instance Mutable (Pat a) where
     mutate pat = case pat of
         _ -> []
+
+
+instance Mutable (Exp a) where
+    mutate (InfixApp l e1 qOp e2)       = m3 (InfixApp l) e1 qOp e2
+    mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
+    mutate (Lit l literal)              = m1 (Lit l) literal
+    mutate _ = []
 
 instance Mutable (QOp a) where
     mutate (QVarOp l qName) = m1 (QVarOp l) qName
