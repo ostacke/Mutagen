@@ -122,8 +122,23 @@ instance Mutable (Name a) where
         _ -> []
 
 instance Mutable (Pat a) where
-    mutate pat = case pat of
-        _ -> []
+  mutate (PVar l n)              = m1 (PVar l) n
+  mutate (PLit l s li)           = [] -- m2 (PLit l) s li
+  mutate (PNPlusK l n i)         = [] -- m2 (PNPlusK l) n i
+  mutate (PInfixApp l p1 n p2)   = m3 (PInfixApp l) p1 n p2
+  mutate (PApp l n p)            = m2 (PApp l) n p
+  mutate (PTuple l b p)          = m2 (PTuple l) b p
+  mutate (PUnboxedSum l i1 i2 p) = [] -- m3 (PUnboxedSum l) i1 i2 p
+  mutate (PList l p)             = m1 (PList l) p
+  mutate (PParen l p)            = m1 (PParen l) p
+  mutate (PRec l n p)            = [] -- m2 (PRec l) n p
+  mutate (PAsPat l n p)          = m2 (PAsPat l) n p
+  mutate (PWildCard l)           = []
+  mutate (PIrrPat l p)           = m1 (PIrrPat l) p
+  mutate (PatTypeSig l p t)      = [] -- m2 (PatTypeSig l) p t
+  mutate (PViewPat l e p)        = m2 (PViewPat l) e p
+  mutate (PRPat l r)             = [] -- m1 (PRPat l) r
+  mutate (PBangPat l p)          = m1 (PBangPat l) p
 
 instance Mutable (Exp a) where
   mutate (Var l qn)                      = m1 (Var l) qn
