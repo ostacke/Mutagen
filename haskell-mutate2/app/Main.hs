@@ -30,37 +30,20 @@ main = do
 
     case args of
         "--help"       : _  -> showUsage
-        "--project-dir": xs -> launchAtProject $ head xs
-
+        "--project-dir": xs -> makeAbsolute (head xs) >>= launchAtProject
         _ -> showUsage
-
-
-getOutputDir :: [String] -> String
-getOutputDir []     = "./out"
-getOutputDir (x:xs) = case x of
-    "--output-dir" -> head xs
-    _ -> getOutputDir xs
-
-
-getProjectDir :: [String] -> String
-getProjectDir [] = "./"
-getProjectDir (x:xs) = case x of
-    "--project-dir" -> head xs
-    _ -> getProjectDir xs
 
 
 showUsage :: IO ()
 showUsage = do 
     putStrLn "Usage: haskell-mutate2-exe [OPTION]..."
     putStrLn "--help                    Shows this text."
-    putStrLn "--input-file FILE         Specifies input file to mutate."
     putStrLn "--project-dir DIRECTORY   Specifies directory of cabal project."
     putStrLn "                          Should contain a .cabal file and "
     putStrLn "                          defaults to ./ if not specified"
 
 
-launchAtProject :: FilePath -- ^ Path to project directory
-                -> IO ()
+launchAtProject :: FilePath -> IO ()
 launchAtProject projectPath = do
     -- Clean old output folder
     wipeDirIfExists outputDir
@@ -68,10 +51,11 @@ launchAtProject projectPath = do
     -- Get absolute file paths to all files in the source folder
     srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
 
+    -- Mutate and test all source files in turn, generating a 
+    -- result summary, then sums the results.
     rs <- mapM (flip runRoutine projectPath) srcFiles
     let resultSummary = foldl (|+|) emptyRes rs
 
-    -- Print summary of test runs
     printResults resultSummary
     
     where backupDir = projectPath </> backupSuffix
@@ -119,7 +103,7 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
     let testResult = getTestResult exitStatus
     
     -- Perform actions depending on the results
-    testResHandler testResult m filePath (projectPath </> outputSuffix)
+    handleTestResult testResult m filePath (projectPath </> outputSuffix)
 
     -- Update the summary values depending on the results
     let newSum = updateSummary testSum testResult
@@ -135,12 +119,12 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
 --   If mutant survivied, print information and copy mutant to the given
 --   directory
 --   If testing returned an error, prints the information put does nohting else.
-testResHandler :: TestResult            -- ^ The test result to judge.
-               -> Module SrcSpanInfo    -- ^ The mutant that was tested.
-               -> FilePath              -- ^ The file path of the mutant.
-               -> FilePath              -- ^ The path of the output root directory.
-               -> IO ()
-testResHandler res mutant mutantPath outDir = case res of
+handleTestResult :: TestResult            -- ^ The test result to judge.
+                 -> Module SrcSpanInfo    -- ^ The mutant that was tested.
+                 -> FilePath              -- ^ The file path of the mutant.
+                 -> FilePath              -- ^ The path of the output root directory.
+                 -> IO ()
+handleTestResult res mutant mutantPath outDir = case res of
     Killed stdout -> putStrLn "Testing failed; mutant was KILLED."
     
     Error stderr -> do 
