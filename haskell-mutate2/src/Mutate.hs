@@ -120,8 +120,16 @@ instance Mutable (Decl a) where
         TypeSig l name typ -> []
         PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> []
         FunBind l match -> m1 (FunBind l) match
-        PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
-        PatSyn l pat1 pat2 patternSynDirection -> [] --TODO, vad är skillnaden mellan en pattern synonym och en pattern synonym signature declaration?
+        PatBind l pat rhs binds
+            -- -> m3 (PatBind l) pat rhs mbyBinds
+            -> mutantsA ++ mutantsB ++ mutantsC
+                where
+                mutantsA = map (\x -> PatBind l x rhs mbyBinds) (mutate pat)
+                mutantsB = map (\x -> PatBind l pat x mbyBinds) (mutate rhs)
+                mutantsC = map (\x -> PatBind l pat rhs x) bindsMutate
+                bindsMutate = [x | x <- (mutate binds), x !! Nothing]
+        PatSyn l pat1 pat2 patternSynDirection
+            -> m3 (PatSyn l) pat1 pat2 patternSynDirection --TODO, vad är skillnaden mellan en pattern synonym och en pattern synonym signature declaration?
         ForImp l callConv safety string name typ -> []
         ForExp l callConv string name typ -> []
         RulePragmaDecl l rule -> []
@@ -244,6 +252,11 @@ instance Mutable (Literal a) where
     mutate _ = []
 -- Helper function for mutate on Literals
 mapLit constr param xs = map (\x -> constr x (show x)) xs
+
+{- Borde nog inte muteras
+-}
+instance Mutable (PatternSynDirection a) where
+    mutate _ = []
 
 instance (Mutable a) => Mutable (Maybe a) where
     mutate (Just a) = Nothing : m1 Just a
