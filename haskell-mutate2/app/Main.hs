@@ -67,6 +67,8 @@ launchAtProject projectPath = do
 --   original file back. Then returns the updated TestSummary.
 runRoutine :: FilePath -> FilePath -> IO ResultSummary
 runRoutine filePath projectPath = do
+    putStrLn $ "Performing tests on mutant: " ++ takeFileName filePath
+
     -- Back up the original file to the backup directory, creating the backup
     -- directory if not already existing.
     backupOriginal filePath backupDir
