@@ -5,6 +5,7 @@ module Mutate
 import GHC.Float
 import Language.Haskell.Exts
 import Data.List
+import Data.Maybe
 
 -- | Defining a class Mutable. The function mutate takes a member of the 
 --   class as an argument, and the result is of the same type. (?)
@@ -124,10 +125,10 @@ instance Mutable (Decl a) where
             -- -> m3 (PatBind l) pat rhs mbyBinds
             -> mutantsA ++ mutantsB ++ mutantsC
                 where
-                mutantsA = map (\x -> PatBind l x rhs mbyBinds) (mutate pat)
-                mutantsB = map (\x -> PatBind l pat x mbyBinds) (mutate rhs)
+                mutantsA = map (\x -> PatBind l x rhs binds) (mutate pat)
+                mutantsB = map (\x -> PatBind l pat x binds) (mutate rhs)
                 mutantsC = map (\x -> PatBind l pat rhs x) bindsMutate
-                bindsMutate = [x | x <- (mutate binds), x !! Nothing]
+                bindsMutate = [x | x <- (mutate binds), not (isNothing x)]
         PatSyn l pat1 pat2 patternSynDirection
             -> m3 (PatSyn l) pat1 pat2 patternSynDirection --TODO, vad är skillnaden mellan en pattern synonym och en pattern synonym signature declaration?
         ForImp l callConv safety string name typ -> []
