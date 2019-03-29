@@ -45,6 +45,10 @@ showUsage = do
 
 launchAtProject :: FilePath -> IO ()
 launchAtProject projectPath = do
+    -- Build and run the unmodified test suites to see that they work when 
+    -- unmodified.
+    --checkTestSuites projectPath
+
     -- Clean old output folder
     wipeDirIfExists outputDir
 

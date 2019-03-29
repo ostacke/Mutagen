@@ -4,6 +4,7 @@
 
 module Path 
     ( srcDirFromProject
+    , testSuitesFromProject
     , getAbsoluteDirContents
     , filePathsFromDir
     ) where
@@ -28,6 +29,24 @@ filePathsFromDir dir = do
     let recursiveFiles = concat r
 
     return $ files ++ recursiveFiles
+
+
+-- | Given the path to a directory containing a .cabal file,
+--   returns the names of the test suites specified in the file.
+testSuitesFromProject :: FilePath -> IO [String]
+testSuitesFromProject projectDir = do
+    cabalContents <- readFile =<< cabalPathFromProject projectDir
+    return $ testSuitesFromCabal cabalContents
+
+
+-- Given the contents of a .cabal file, returns a list with the names 
+-- of the test suites.
+testSuitesFromCabal :: String -> [String]
+testSuitesFromCabal contents = findTestSuites $ lines contents
+    where findTestSuites [] = []
+          findTestSuites (x:xs) = case "test-suite" `isPrefixOf` x of
+              True -> fromJust (stripPrefix "test-suite " x) : findTestSuites xs
+              False -> findTestSuites xs
 
 
 -- | Given the path to a directory containing a .cabal file,
