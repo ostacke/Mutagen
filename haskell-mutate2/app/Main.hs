@@ -47,7 +47,7 @@ launchAtProject :: FilePath -> IO ()
 launchAtProject projectPath = do
     -- Build and run the unmodified test suites to see that they work when 
     -- unmodified.
-    --checkTestSuites projectPath
+    checkTestSuites projectPath
 
     -- Clean old output folder
     wipeDirIfExists outputDir
@@ -64,6 +64,41 @@ launchAtProject projectPath = do
     
     where backupDir = projectPath </> backupSuffix
           outputDir = projectPath </> outputSuffix
+
+
+checkTestSuites :: FilePath -> IO ()
+checkTestSuites projectPath = do
+    putStrLn "==> Running tests on ORIGINAL code..."
+
+    testSuites <- testSuitesFromProject projectPath
+    setCurrentDirectory projectPath
+    results <- runTestSuites testSuites emptyRes
+
+    case results of
+        ResultSummary _ 0 0 -> putStrLn "No problems found."
+        ResultSummary _ k e -> do
+            putStrLn "==> WARNING:"
+            putStrLn $ "There were " ++ show k ++ " failed test(s) and "
+            putStrLn $ show e ++ " error(s) when testing the ORIGINAL code."
+            putStrLn ""
+
+
+runTestSuites :: [String] -> ResultSummary -> IO ResultSummary
+runTestSuites [] s = return s
+runTestSuites (x:xs) s = do
+    exitCode <- readProcessWithExitCode "cabal" ["test", x] ""
+    let res = getTestResult exitCode
+    let summary = updateSummary s res
+    case res of
+        Killed stdout -> do
+            putStrLn $ "WARNING: Test suite failed:\n"
+            putStrLn stdout
+            runTestSuites xs summary
+        Error stderr -> do
+            putStrLn $ "WARNING: There was an error when running testsuite:\n"
+            putStrLn stderr
+            runTestSuites xs summary
+        _ -> runTestSuites xs summary
 
 
 -- | Given a path to a file, project, and a TestSummary, runs the process of 
