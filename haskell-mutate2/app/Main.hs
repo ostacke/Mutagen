@@ -52,7 +52,8 @@ launchAtProject projectPath = do
     srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
 
     -- Mutate and test all source files in turn, generating a 
-    -- result summary, then sums the results.
+    -- result summary, then sums the results. Also saves surviving 
+    -- mutants to file.
     rs <- mapM (flip runRoutine projectPath) srcFiles
     let resultSummary = foldl (|+|) emptyRes rs
 
@@ -120,7 +121,7 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
 --   If mutant was killed, tell the user but do nothing else.
 --   If mutant survivied, print information and copy mutant to the given
 --   directory
---   If testing returned an error, prints the information put does nohting else.
+--   If testing returned an error, prints the information put does nothing else.
 handleTestResult :: TestResult            -- ^ The test result to judge.
                  -> Module SrcSpanInfo    -- ^ The mutant that was tested.
                  -> FilePath              -- ^ The file path of the mutant.
