@@ -141,13 +141,14 @@ instance Mutable (Pat a) where
   mutate (PBangPat l p)          = m1 (PBangPat l) p
 
 instance Mutable (Exp a) where
+  mutate (App l e1 e2)                   = (App l (mInject l) (App l e1 e2)) : m2 (App l) e1 e2
+    where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
   mutate (Var l qn)                      = m1 (Var l) qn
   mutate (OverloadedLabel l str)         = []
   mutate (IPVar l n)                     = m1 (IPVar l) n
   mutate (Con l n)                       = m1 (Con l) n
   mutate (Lit l literal)                 = m1 (Lit l) literal
   mutate (InfixApp l e1 qOp e2)          = m3 (InfixApp l) e1 qOp e2
-  mutate (App l e1 e2)                   = m2 (App l) e1 e2
   mutate (NegApp l e)                    = e : mutate e ++ m1 (NegApp l) e
   mutate (Lambda l p e)                  = m2 (Lambda l) p e
   mutate (Let l b e)                     = m2 (Let l) b e
@@ -182,6 +183,7 @@ instance Mutable (Exp a) where
   mutate (LeftArrHighApp l e1 e2)        = m2 (LeftArrHighApp l) e1 e2
   mutate (RightArrHighApp l e1 e2)       = m2 (RightArrHighApp l) e1 e2
   mutate _                               = []
+
 
 instance Mutable (IPName a) where
   mutate _ = []
