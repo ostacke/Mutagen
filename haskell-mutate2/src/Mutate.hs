@@ -122,14 +122,76 @@ instance Mutable (Name a) where
         _ -> []
 
 instance Mutable (Pat a) where
-    mutate pat = case pat of
-        _ -> []
+  mutate (PVar l n)              = m1 (PVar l) n
+  mutate (PLit l s li)           = [] -- m2 (PLit l) s li
+  mutate (PNPlusK l n i)         = [] -- m2 (PNPlusK l) n i
+  mutate (PInfixApp l p1 n p2)   = m3 (PInfixApp l) p1 n p2
+  mutate (PApp l n p)            = m2 (PApp l) n p
+  mutate (PTuple l b p)          = m2 (PTuple l) b p
+  mutate (PUnboxedSum l i1 i2 p) = [] -- m3 (PUnboxedSum l) i1 i2 p
+  mutate (PList l p)             = m1 (PList l) p
+  mutate (PParen l p)            = m1 (PParen l) p
+  mutate (PRec l n p)            = [] -- m2 (PRec l) n p
+  mutate (PAsPat l n p)          = m2 (PAsPat l) n p
+  mutate (PWildCard l)           = []
+  mutate (PIrrPat l p)           = m1 (PIrrPat l) p
+  mutate (PatTypeSig l p t)      = [] -- m2 (PatTypeSig l) p t
+  mutate (PViewPat l e p)        = m2 (PViewPat l) e p
+  mutate (PRPat l r)             = [] -- m1 (PRPat l) r
+  mutate (PBangPat l p)          = m1 (PBangPat l) p
 
 instance Mutable (Exp a) where
-    mutate (InfixApp l e1 qOp e2)       = m3 (InfixApp l) e1 qOp e2
-    mutate (If l ifExp thenExp elseExp) = m3 (If l) ifExp thenExp elseExp
-    mutate (Lit l literal)              = m1 (Lit l) literal
-    mutate _                            = []
+  mutate (Var l qn)                      = m1 (Var l) qn
+  mutate (OverloadedLabel l str)         = []
+  mutate (IPVar l n)                     = m1 (IPVar l) n
+  mutate (Con l n)                       = m1 (Con l) n
+  mutate (Lit l literal)                 = m1 (Lit l) literal
+  mutate (InfixApp l e1 qOp e2)          = m3 (InfixApp l) e1 qOp e2
+  mutate (App l e1 e2)                   = m2 (App l) e1 e2
+  mutate (NegApp l e)                    = e : mutate e ++ m1 (NegApp l) e
+  mutate (Lambda l p e)                  = m2 (Lambda l) p e
+  mutate (Let l b e)                     = m2 (Let l) b e
+  mutate (If l ifExp thenExp elseExp)    = m3 (If l) ifExp thenExp elseExp
+  mutate (MultiIf l g)                   = m1 (MultiIf l) g
+  mutate (Case l e a)                    = m2 (Case l) e a
+  mutate (Do l s)                        = m1 (Do l) s -- The last statement in the list should be an expression.
+  mutate (MDo l s)                       = m1 (MDo l) s
+  mutate (Tuple l b e)                   = m2 (Tuple l) b e
+  mutate (UnboxedSum l i1 i2 e)          = [] -- m3 (UnboxedSum l) i1 i2 e
+  mutate (TupleSection l b e)            = m2 (TupleSection l) b e
+  mutate (List l e)                      = m1 (List l) e
+  mutate (ParArray l e)                  = m1 (ParArray l) e
+  mutate (Paren l e)                     = m1 (Paren l) e
+  mutate (LeftSection l o e)             = m2 (LeftSection l) o e
+  mutate (RightSection l e o)            = m2 (RightSection l) e o
+  mutate (RecConstr l n u)               = [] -- m2 (RecConstr l) n u
+  mutate (RecUpdate l e u)               = [] -- m2 (RecUpdate l) e u
+  mutate (EnumFrom l e)                  = List l [e] : m1 (EnumFrom l) e
+  mutate (EnumFromTo l e1 e2)            = m2 (EnumFromTo l) e1 e2
+  mutate (EnumFromThen l e1 e2)          = m2 (EnumFromThen l) e1 e2
+  mutate (EnumFromThenTo l e1 e2 e3)     = m3 (EnumFromThenTo l) e1 e2 e3
+  mutate (ParArrayFromTo l e1 e2)        = m2 (ParArrayFromTo l) e1 e2
+  mutate (ParArrayFromThenTo l e1 e2 e3) = m3 (ParArrayFromThenTo l) e1 e2 e3
+  mutate (ListComp l e q)                = [] -- m2 (ListComp l) e q
+  mutate (ParComp l e q)                 = [] -- m2 (ParComp l) e q
+  mutate (ParArrayComp l e q)            = [] -- m2 (ParArrayComp l) e q
+  mutate (ExpTypeSig l e t)              = [e] -- e : m2 (ExpTypeSig l) e t
+  mutate (Proc l p e)                    = m2 (Proc l) p e
+  mutate (LeftArrApp l e1 e2)            = m2 (LeftArrApp l) e1 e2
+  mutate (RightArrApp l e1 e2)           = m2 (RightArrApp l) e1 e2
+  mutate (LeftArrHighApp l e1 e2)        = m2 (LeftArrHighApp l) e1 e2
+  mutate (RightArrHighApp l e1 e2)       = m2 (RightArrHighApp l) e1 e2
+  mutate _                               = []
+
+instance Mutable (IPName a) where
+  mutate _ = []
+
+instance Mutable (Alt a) where
+  mutate (Alt l pat rhs binds) = m3 (Alt l) pat rhs binds
+
+instance Mutable Boxed where
+  mutate Boxed = [Unboxed]
+  mutate Unboxed = [Boxed]
 
 instance Mutable (QOp a) where
     mutate (QVarOp l qName) = m1 (QVarOp l) qName
