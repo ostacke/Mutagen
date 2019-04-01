@@ -1,19 +1,36 @@
 module Mutate
     ( mutate
     , safeMutate
+    , injectMutateInject
     ) where
 
 import GHC.Float
 import Language.Haskell.Exts
 import Data.List
 
+
 -- | Defining a class Mutable. The function mutate takes a member of the 
 --   class as an argument, and the result is of the same type. (?)
 class Mutable a where
     mutate :: a -> [a]
 
+-- | Removes mutations identical to the original input
 safeMutate :: (Mutable a, Eq a) => a -> [a]
 safeMutate a = filter (/= a) $ nub $ mutate a
+
+-- | Adds "import MutateInject" to the import declarations of a Module
+injectMutateInject :: Module SrcSpanInfo -> Module SrcSpanInfo
+injectMutateInject m = case m of
+    Module l mb ps imports ds -> Module l mb ps (injectedImport : imports) ds
+        where injectedImport = ImportDecl 
+                                { importAnn = l
+                                , importModule = ModuleName l "MutateInject"
+                                , importQualified = False
+                                , importSrc = False
+                                , importSafe = False
+                                , importPkg = Nothing
+                                , importAs = Nothing
+                                , importSpecs = Nothing } 
 
 m1 :: (Mutable a) => (a -> b) -> a -> [b]
 m1 f a = aMutants

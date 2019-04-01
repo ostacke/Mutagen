@@ -205,8 +205,11 @@ mutateFile path = do
     parseRes <- parseFile path
 
     case parseRes of
-        ParseOk syntaxTree -> return $ safeMutate syntaxTree
-        ParseFailed l errMsg -> showParsingError
+        ParseOk syntaxTree -> 
+            return $ map injectMutateInject $ safeMutate syntaxTree
+
+        ParseFailed l errMsg -> 
+            showParsingError
 
             where showParsingError = do
                     putStrLn "PARSING FAILED:"
