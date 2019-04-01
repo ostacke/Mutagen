@@ -45,6 +45,9 @@ showUsage = do
 
 launchAtProject :: FilePath -> IO ()
 launchAtProject projectPath = do
+    -- Copy MutateInject.hs to project directory
+    srcDirFromProject projectPath >>= copyMutateInject
+
     -- Clean old output folder
     wipeDirIfExists outputDir
 
