@@ -7,6 +7,7 @@ module Mutate
 import GHC.Float
 import Language.Haskell.Exts
 import Data.List
+import Data.Maybe
 
 
 -- | Defining a class Mutable. The function mutate takes a member of the 
@@ -94,20 +95,113 @@ instance (Show a) => Mutable (Module a) where
         Module l mbyHead pragmas importDecls decls ->
             mod : m4 (Module l) mbyHead pragmas importDecls decls
 
+{-  ModuleHead includes the name and export information. Should
+    probably remain unmutated.
+-}
 instance Mutable (ModuleHead a) where
     mutate rest = []
 
+{-  ModulePragma contains messages to the compiler. Should probably
+    remain unmutated.
+-}
 instance Mutable (ModulePragma a) where
     mutate rest = []
 
+{-  ImportDecl contains import declarations. Should probably remain
+    unmutated.
+-}
 instance Mutable (ImportDecl a) where
   mutate rest = []
 
+{-  Decl is the top level of all the declarations and functions
+    in a Haskell file.
+    Mutated: Operator fixity, function binding clauses and pattern bindings
+-}
 instance Mutable (Decl a) where
     mutate decl = case decl of
-        PatBind l pat rhs mbyBinds -> m3 (PatBind l) pat rhs mbyBinds
-
+        TypeDecl l declHead typ -> []
+        TypeFamDecl l declHead resultSig injectivityInfo -> []
+        ClosedTypeFamDecl l declHead resultSig injectivityInfo typeEqn -> []
+        DataDecl l dataOrNew context declHead qualConDecl derivin -> []
+        GDataDecl l dataOrNew context declHead kind gadtDecl derivin -> []
+        DataFamDecl l context declHead resultSig -> []
+        TypeInsDecl l typ1 typ2 -> []
+        DataInsDecl l dataOrNew typ qualConDecl derivin -> []
+        GDataInsDecl l dataOrNew typ kind gadtDecl derivin -> []
+        ClassDecl l context declHead funDep classDecl -> []
+        InstDecl l overlap instRule instDecl
+            -> m3 (InstDecl l) overlap instRule instDecl
+        DerivDecl l derivStrategy overlap instRule -> []
+        InfixDecl l assoc int op
+            -> mutantsA ++ mutantsB
+                where
+                mutantsA = map(\x -> InfixDecl l x int op) (mutate assoc)
+                mutantsB = map(\x -> InfixDecl l assoc x op) (precMutate)
+                precMutate = map Just [0..9]
+        DefaultDecl l typ -> []
+        SpliceDecl l exp
+            -> m1 (SpliceDecl l) exp
+        TypeSig l name typ -> []
+        PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> []
+        FunBind l match -> m1 (FunBind l) match
+        PatBind l pat rhs binds
+            -- -> m3 (PatBind l) pat rhs mbyBinds
+            -> mutantsA ++ mutantsB ++ mutantsC
+                where
+                mutantsA = map (\x -> PatBind l x rhs binds) (mutate pat)
+                mutantsB = map (\x -> PatBind l pat x binds) (mutate rhs)
+                mutantsC = map (\x -> PatBind l pat rhs x) bindsMutate
+                bindsMutate = [x | x <- (mutate binds), not (isNothing x)]
+        PatSyn l pat1 pat2 patternSynDirection
+            -> m3 (PatSyn l) pat1 pat2 patternSynDirection --TODO, vad är skillnaden mellan en pattern synonym och en pattern synonym signature declaration?
+        ForImp l callConv safety string name typ -> []
+        ForExp l callConv string name typ -> []
+        RulePragmaDecl l rule -> []
+        DeprPragmaDecl l nameString -> []
+        WarnPragmaDecl l nameString -> []
+        InlineSig l bool activation qName -> []
+        InlineConlikeSig l activation qName -> []
+        SpecSig l activation qName typ -> []
+        SpecInlineSig l bool activation qName typ -> []
+        InstSig l instRule -> []
+        AnnPragma l booleanFormula -> []
+        MinimalPragma l booleanFormula -> []
+        RoleAnnotDecl l qName role -> []
+        CompletePragma l name qName -> []
         _ -> []
+
+{- Det här borde man kunna göra snyggare..
+-}
+instance Mutable (Assoc a) where
+    mutate (AssocNone l)  = [AssocNone l, AssocLeft l, AssocRight l]
+    mutate (AssocLeft l)  = [AssocNone l, AssocLeft l, AssocRight l]
+    mutate (AssocRight l) = [AssocNone l, AssocLeft l, AssocRight l]
+
+instance Mutable (Op a) where
+    mutate _ = []
+
+instance Mutable Int where
+    mutate n = [0, 1, n+1, n-1, n*(-1)]
+
+{- Borde inte muteras
+-}
+instance Mutable (Overlap a) where
+    mutate _ = []
+
+{- Borde inte muteras
+-}
+instance Mutable (InstRule a) where
+    mutate _ = []
+
+instance Mutable (InstDecl a) where
+    mutate instDecl = case instDecl of    
+        InsDecl l decl -> m1 (InsDecl l) decl
+        _ -> []
+
+{- TODO
+-}
+instance Mutable (Alt a) where
+    mutate _ = []
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
@@ -119,6 +213,8 @@ instance Mutable (Rhs a) where
 instance Mutable (GuardedRhs a) where
     mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
 
+{- TODO
+-}
 instance Mutable (Stmt a) where
     mutate _ = []
 
@@ -156,6 +252,7 @@ instance Mutable (Pat a) where
   mutate (PViewPat l e p)        = m2 (PViewPat l) e p
   mutate (PRPat l r)             = [] -- m1 (PRPat l) r
   mutate (PBangPat l p)          = m1 (PBangPat l) p
+
 
 instance Mutable (Exp a) where
   mutate (App l e1 e2)                   = (App l (mInject l) (App l e1 e2)) : m2 (App l) e1 e2
@@ -248,6 +345,11 @@ instance Mutable (Literal a) where
     mutate _ = []
 -- Helper function for mutate on Literals
 mapLit constr param xs = map (\x -> constr x (show x)) xs
+
+{- Borde nog inte muteras
+-}
+instance Mutable (PatternSynDirection a) where
+    mutate _ = []
 
 instance (Mutable a) => Mutable (Maybe a) where
     mutate (Just a) = Nothing : m1 Just a
