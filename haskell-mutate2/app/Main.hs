@@ -49,6 +49,9 @@ launchAtProject projectPath = do
     -- unmodified.
     checkTestSuites projectPath
 
+    -- Copy MutateInject.hs to project directory
+    srcDirFromProject projectPath >>= copyMutateInject
+
     -- Clean old output folder
     wipeDirIfExists outputDir
 
@@ -56,7 +59,8 @@ launchAtProject projectPath = do
     srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
 
     -- Mutate and test all source files in turn, generating a 
-    -- result summary, then sums the results.
+    -- result summary, then sums the results. Also saves surviving 
+    -- mutants to file.
     rs <- mapM (flip runRoutine projectPath) srcFiles
     let resultSummary = foldl (|+|) emptyRes rs
 
@@ -159,7 +163,7 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
 --   If mutant was killed, tell the user but do nothing else.
 --   If mutant survivied, print information and copy mutant to the given
 --   directory
---   If testing returned an error, prints the information put does nohting else.
+--   If testing returned an error, prints the information put does nothing else.
 handleTestResult :: TestResult            -- ^ The test result to judge.
                  -> Module SrcSpanInfo    -- ^ The mutant that was tested.
                  -> FilePath              -- ^ The file path of the mutant.
@@ -240,8 +244,11 @@ mutateFile path = do
     parseRes <- parseFile path
 
     case parseRes of
-        ParseOk syntaxTree -> return $ safeMutate syntaxTree
-        ParseFailed l errMsg -> showParsingError
+        ParseOk syntaxTree -> 
+            return $ map injectMutateInject $ safeMutate syntaxTree
+
+        ParseFailed l errMsg -> 
+            showParsingError
 
             where showParsingError = do
                     putStrLn "PARSING FAILED:"

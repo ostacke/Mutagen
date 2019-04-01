@@ -26,6 +26,8 @@ dependencies:
 - pretty-simple
 - process
 - filepath
+- file-embed
+- bytestring
 
 library:
   source-dirs: src
