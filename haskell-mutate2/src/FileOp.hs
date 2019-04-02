@@ -5,6 +5,7 @@ module FileOp
     , backupOriginal
     , restoreOriginal
     , copyMutateInject
+    , cleanMutateInject
     ) where
 
 import Data.FileEmbed
@@ -23,6 +24,13 @@ copyMutateInject srcDir = do
 
     where fileName = takeFileName "./src/MutateInject.hs"
 
+-- | Removes MutateInject.hs from the target directory.
+cleanMutateInject :: FilePath -> IO ()
+cleanMutateInject dir = do 
+    mbyFP <- findFile [dir] "MutateInject.hs"
+    case mbyFP of
+        Just path -> withCurrentDirectory dir $ removeFile path
+        Nothing -> putStrLn "Could not find file 'MutateInject.hs' to clean."
 
 -- | Deletes directory (recursively) if it exists and replaces it with a new,
 --   empty directory. Creates a new directory if it does not exist.

@@ -52,7 +52,8 @@ launchAtProject projectPath = do
     -- Clean old output folder
     wipeDirIfExists outputDir
     
-    -- Get absolute file paths to all files in the source folder
+    -- Get absolute file paths to all files in the source folder.
+    -- NOTE: This needs to run BEFORE injecting MutateInject.hs
     srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
 
     -- Copy MutateInject.hs to project directory
@@ -65,6 +66,9 @@ launchAtProject projectPath = do
     -- mutants to file.
     rs <- mapM (flip runRoutine projectPath) srcFiles
     let resultSummary = foldl (|+|) emptyRes rs
+
+    -- Remove the injected MutateInject.hs file.
+    srcDirFromProject projectPath >>= cleanMutateInject
 
     printResults resultSummary
     
