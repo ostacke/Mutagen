@@ -45,6 +45,9 @@ showUsage = do
 
 launchAtProject :: FilePath -> IO ()
 launchAtProject projectPath = do
+    -- Check if there already exists a "MutateInject.hs"
+    checkInjectExists
+
     -- Build and run the unmodified test suites to see that they work when 
     -- unmodified.
     checkTestSuites projectPath
@@ -74,6 +77,10 @@ launchAtProject projectPath = do
     
     where backupDir = projectPath </> backupSuffix
           outputDir = projectPath </> outputSuffix
+          checkInjectExists = do 
+              exists <- doesFileExist $ projectPath </> "MutateInject.hs"
+              when exists $ Prelude.error "MutateInject.hs already exists in \
+                                          \source directory! Aborting."
 
 
 checkTestSuites :: FilePath -> IO ()
