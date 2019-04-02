@@ -49,14 +49,16 @@ launchAtProject projectPath = do
     -- unmodified.
     checkTestSuites projectPath
 
-    -- Copy MutateInject.hs to project directory
-    srcDirFromProject projectPath >>= copyMutateInject
-
     -- Clean old output folder
     wipeDirIfExists outputDir
-
+    
     -- Get absolute file paths to all files in the source folder
     srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
+
+    -- Copy MutateInject.hs to project directory
+    -- NOTE: This needs to happen AFTER getting the source file paths, 
+    --       otherwise the program tries to mutate our injected file.
+    srcDirFromProject projectPath >>= copyMutateInject
 
     -- Mutate and test all source files in turn, generating a 
     -- result summary, then sums the results. Also saves surviving 
