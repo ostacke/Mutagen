@@ -136,7 +136,7 @@ instance Mutable (Decl a) where
             -> mutantsA ++ mutantsB
                 where
                 mutantsA = map(\x -> InfixDecl l x int op) (mutate assoc)
-                mutantsB = map(\x -> InfixDecl l assoc x op) (precMutate)
+                mutantsB = map(\x -> InfixDecl l assoc x op) precMutate
                 precMutate = map Just [0..9]
         DefaultDecl l typ -> []
         SpliceDecl l exp
@@ -151,7 +151,7 @@ instance Mutable (Decl a) where
                 mutantsA = map (\x -> PatBind l x rhs binds) (mutate pat)
                 mutantsB = map (\x -> PatBind l pat x binds) (mutate rhs)
                 mutantsC = map (\x -> PatBind l pat rhs x) bindsMutate
-                bindsMutate = [x | x <- (mutate binds), not (isNothing x)]
+                bindsMutate = [x | x <- (mutate binds), isJust x]
         PatSyn l pat1 pat2 patternSynDirection
             -> m3 (PatSyn l) pat1 pat2 patternSynDirection --TODO, vad är skillnaden mellan en pattern synonym och en pattern synonym signature declaration?
         ForImp l callConv safety string name typ -> []
@@ -168,7 +168,7 @@ instance Mutable (Decl a) where
         MinimalPragma l booleanFormula -> []
         RoleAnnotDecl l qName role -> []
         CompletePragma l name qName -> []
-        _ -> []
+        -- _ -> []
 
 {- Det här borde man kunna göra snyggare..
 -}
@@ -200,10 +200,7 @@ instance Mutable (InstDecl a) where
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
-
     mutate (GuardedRhss l guardedRhss) = m1 (GuardedRhss l) guardedRhss
-
-    mutate _ = []
 
 instance Mutable (GuardedRhs a) where
     mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
@@ -225,9 +222,13 @@ instance Mutable (Match a) where
 
 instance Mutable (Name a) where
     mutate name = case name of
-        Symbol l s -> [(Symbol l "-")]
-
+        Symbol l s -> map (Symbol l) $ eqMuts ++ ordMuts ++ intOpMuts ++ fracOpMuts
         _ -> []
+
+        where eqMuts = ["==", "/="]
+              ordMuts = ["<", ">", "<=", ">="]
+              intOpMuts = ["+", "-", "*", "%"]
+              fracOpMuts = ["/"]
 
 instance Mutable (Pat a) where
   mutate (PVar l n)              = m1 (PVar l) n
@@ -327,8 +328,8 @@ instance Mutable (Literal a) where
     mutate (Char l char _) = mapLit (Char l) char (charMuts char)
       where constChars = ['x', 'a', '%', '\0', '\n']
             charMuts c = filter (/= c) $ (case c of
-                                           minBound -> [succ c]
-                                           maxBound -> [pred c]
+                                           '\NUL'     -> [succ c]
+                                           '\1114111' -> [pred c]
                                            _ -> [succ c, pred c]
                                          ) ++ constChars
 
