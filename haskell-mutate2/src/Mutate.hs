@@ -198,11 +198,6 @@ instance Mutable (InstDecl a) where
         InsDecl l decl -> m1 (InsDecl l) decl
         _ -> []
 
-{- TODO
--}
-instance Mutable (Alt a) where
-    mutate _ = []
-
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
 
