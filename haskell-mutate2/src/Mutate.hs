@@ -275,9 +275,9 @@ instance Mutable (Exp a) where
         MDo l ss                      -> m1 (MDo l) ss
         Tuple l b es                  -> m2 (Tuple l) b es
         UnboxedSum l i1 i2 e          -> m3 (UnboxedSum l) i1 i2 e
-        TupleSection l b es           -> m2 (TupleSection l) b es
-        List l es                     -> m1 (List l) es
-        ParArray l es                 -> m1 (ParArray l) es
+        TupleSection l b mbyExp       -> m2 (TupleSection l) b mbyExp
+        List l es                     -> map (List l) (listMuts es) ++ m1 (List l) es
+        ParArray l es                 -> map (ParArray l) (listMuts es) ++ m1 (ParArray l) es
         Paren l e                     -> m1 (Paren l) e
         LeftSection l o e             -> m2 (LeftSection l) o e
         RightSection l e o            -> m2 (RightSection l) e o
@@ -302,12 +302,13 @@ instance Mutable (Exp a) where
         _ -> []
 
         where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
-              -- TODO: Add more cases for how to shuffle guards and cases
+              -- TODO: Add more cases for how to shuffle guards, cases, 
+              --       and lists.
               guardMuts gs = [reverse gs, last gs : init gs]
               caseMuts as = [reverse as, last as : init as]
+              listMuts xs = [reverse xs, last xs : init xs, tail xs, init xs,
+                             [head xs]]
 
-        
-        
 instance Mutable (IPName a) where
   mutate _ = []
 
