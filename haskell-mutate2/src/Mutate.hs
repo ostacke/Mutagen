@@ -259,8 +259,6 @@ instance Mutable (Exp a) where
     mutate exp = case exp of
 
         Var l qn                      -> App l (mInject l) exp : m1 (Var l) qn
-        OverloadedLabel l str         -> []
-        IPVar l n                     -> []
         Con l n                       -> m1 (Con l) n
         Lit l literal                 -> m1 (Lit l) literal
         InfixApp l e1 qOp e2          -> App l (mInject l) exp : m3 (InfixApp l) e1 qOp e2
@@ -269,8 +267,8 @@ instance Mutable (Exp a) where
         Lambda l ps e                 -> m2 (Lambda l) ps e
         Let l b e                     -> m2 (Let l) b e
         If l ifE thenE elseE          -> If l ifE elseE thenE : m3 (If l) ifE thenE elseE
-        MultiIf l gs                  -> map (MultiIf l) (guardMuts gs) ++ m1 (MultiIf l) gs
-        Case l e as                   -> map (Case l e) (caseMuts as) ++ m2 (Case l) e as
+        MultiIf l gs                  -> map (MultiIf l) (listMuts gs) ++ m1 (MultiIf l) gs
+        Case l e as                   -> map (Case l e) (listMuts as) ++ m2 (Case l) e as
         Do l ss                       -> m1 (Do l) ss -- The last statement in the list should be an expression.
         MDo l ss                      -> m1 (MDo l) ss
         Tuple l b es                  -> m2 (Tuple l) b es
@@ -283,7 +281,6 @@ instance Mutable (Exp a) where
         RightSection l e o            -> m2 (RightSection l) e o
         RecConstr l n fus             -> m2 (RecConstr l) n fus
         RecUpdate l e fus             -> m2 (RecUpdate l) e fus
-        
         -- What other mutations can we perform on Enum...?
         EnumFrom l e                  -> List l [e] : m1 (EnumFrom l) e
         EnumFromTo l e1 e2            -> EnumFromTo l e2 e1 : m2 (EnumFromTo l) e1 e2
@@ -292,22 +289,22 @@ instance Mutable (Exp a) where
         ParArrayFromTo l e1 e2        -> ParArrayFromTo l e2 e1 : m2 (ParArrayFromTo l) e1 e2
         ParArrayFromThenTo l e1 e2 e3 -> ParArrayFromThenTo l e3 e2 e1 : m3 (ParArrayFromThenTo l) e1 e2 e3
         ListComp l e qs               -> m2 (ListComp l) e qs
-        ParComp l e qss               -> [] -- m2 (ParComp l) e q
-        ParArrayComp l e qss          -> [] -- m2 (ParArrayComp l) e q
-        ExpTypeSig l e t              -> [e] -- e : m2 (ExpTypeSig l) e t
+        ParComp l e qss               -> m2 (ParComp l) e qss
+        ParArrayComp l e qss          -> m2 (ParArrayComp l) e qss
+        ExpTypeSig l e t              -> e : map (\x -> ExpTypeSig l x t) (mutate e)
         Proc l p e                    -> m2 (Proc l) p e
-        LeftArrApp l e1 e2            -> m2 (LeftArrApp l) e1 e2
-        RightArrApp l e1 e2           -> m2 (RightArrApp l) e1 e2
-        LeftArrHighApp l e1 e2        -> m2 (LeftArrHighApp l) e1 e2
-        RightArrHighApp l e1 e2       -> m2 (RightArrHighApp l) e1 e2
+        LeftArrApp l e1 e2            -> LeftArrApp l e2 e1 : m2 (LeftArrApp l) e1 e2
+        RightArrApp l e1 e2           -> RightArrApp l e2 e1 : m2 (RightArrApp l) e1 e2
+        LeftArrHighApp l e1 e2        -> LeftArrHighApp l e2 e1 : m2 (LeftArrHighApp l) e1 e2
+        RightArrHighApp l e1 e2       -> RightArrHighApp l e2 e1 : m2 (RightArrHighApp l) e1 e2
+        LCase l as                    -> map (LCase l) (listMuts as) ++ m1 (LCase l) as
 
         _ -> []
 
         where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
-              -- TODO: Add more cases for how to shuffle guards, cases, 
-              --       and lists.
-              guardMuts gs = [reverse gs, last gs : init gs]
-              caseMuts as = [reverse as, last as : init as]
+              -- TODO: Add more cases for how to shuffle lists. These appear
+              --       in expressions with guards, cases (alts), and lists.
+              -- Do we need different lists for cases/guards vs. regular lists?
               listMuts xs = [reverse xs, last xs : init xs, tail xs, init xs,
                              [head xs]]
 
