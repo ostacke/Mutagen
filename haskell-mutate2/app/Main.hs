@@ -24,6 +24,7 @@ main = do
     case args of
         "--help"       : _  -> showUsage
         "--project-dir": xs -> makeAbsolute (head xs) >>= launchAtProject
+        "--file"       : xs -> makeAbsolute (head xs) >>= launchOnFile
         _ -> showUsage
 
 
@@ -34,6 +35,8 @@ showUsage = do
     putStrLn "--project-dir DIRECTORY   Specifies directory of cabal project."
     putStrLn "                          Should contain a .cabal file and "
     putStrLn "                          defaults to ./ if not specified"
+    putStrLn "--file FILE               (For debugging) Mutates a file and prints"
+    putStrLn "                                          the mutations."
 
 
 launchAtProject :: FilePath -> IO ()
@@ -242,3 +245,16 @@ mutateFile path = do
                     putStrLn ""
                     return []
 
+-- | For debugging purposes. Performs mutations on a single file and 
+--  prettyPrints the results.
+launchOnFile :: FilePath -> IO ()
+launchOnFile p = do
+    ms <- mutateFile p
+    mapM_ printMutantD ms
+    putStrLn $ "Total number of mutants: " ++ show (length ms)
+
+printMutantD :: Module SrcSpanInfo -> IO ()
+printMutantD m = do
+    putStrLn "\n====> MUTANT START\n"
+    putStrLn $ prettyPrint m
+    putStrLn ""
