@@ -136,7 +136,7 @@ instance Mutable (Decl a) where
             -> mutantsA ++ mutantsB
                 where
                 mutantsA = map(\x -> InfixDecl l x int op) (mutate assoc)
-                mutantsB = map(\x -> InfixDecl l assoc x op) (precMutate)
+                mutantsB = map(\x -> InfixDecl l assoc x op) precMutate
                 precMutate = map Just [0..9]
         DefaultDecl l typ -> []
         SpliceDecl l exp
@@ -151,7 +151,7 @@ instance Mutable (Decl a) where
                 mutantsA = map (\x -> PatBind l x rhs binds) (mutate pat)
                 mutantsB = map (\x -> PatBind l pat x binds) (mutate rhs)
                 mutantsC = map (\x -> PatBind l pat rhs x) bindsMutate
-                bindsMutate = [x | x <- (mutate binds), not (isNothing x)]
+                bindsMutate = [x | x <- (mutate binds), isJust x]
         PatSyn l pat1 pat2 patternSynDirection
             -> m3 (PatSyn l) pat1 pat2 patternSynDirection --TODO, vad är skillnaden mellan en pattern synonym och en pattern synonym signature declaration?
         ForImp l callConv safety string name typ -> []
@@ -168,7 +168,7 @@ instance Mutable (Decl a) where
         MinimalPragma l booleanFormula -> []
         RoleAnnotDecl l qName role -> []
         CompletePragma l name qName -> []
-        _ -> []
+        -- _ -> []
 
 {- Det här borde man kunna göra snyggare..
 -}
@@ -200,23 +200,25 @@ instance Mutable (InstDecl a) where
 
 instance Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
-
     mutate (GuardedRhss l guardedRhss) = m1 (GuardedRhss l) guardedRhss
-
-    mutate _ = []
 
 instance Mutable (GuardedRhs a) where
     mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
 
-{- TODO
--}
 instance Mutable (Stmt a) where
-    mutate _ = []
+    mutate stmt = case stmt of
+        Generator l pat exp -> m2 (Generator l) pat exp
+        Qualifier l exp     -> m1 (Qualifier l) exp
+        LetStmt l binds     -> m1 (LetStmt l) binds
+        RecStmt l stmts     -> m1 (RecStmt l) stmts
 
 instance Mutable (Binds a) where
-    mutate (BDecls l decls) = m1 (BDecls l) decls
-    mutate _ = []
-    -- TODO: mutate (IPBinds l ipbinds) = m1 (BDecls l) ipbinds
+    mutate binds = case binds of
+        BDecls l decls    -> m1 (BDecls l) decls
+        IPBinds l ipbinds -> m1 (IPBinds l) ipbinds
+
+instance Mutable (IPBind a) where
+    mutate (IPBind l ipName exp) = map (IPBind l ipName) (mutate exp)
 
 instance Mutable (Match a) where
     mutate match = case match of
@@ -225,9 +227,13 @@ instance Mutable (Match a) where
 
 instance Mutable (Name a) where
     mutate name = case name of
-        Symbol l s -> [(Symbol l "-")]
-
+        Symbol l s -> map (Symbol l) $ eqMuts ++ ordMuts ++ intOpMuts ++ fracOpMuts
         _ -> []
+
+        where eqMuts = ["==", "/="]
+              ordMuts = ["<", ">", "<=", ">="]
+              intOpMuts = ["+", "-", "*", "%"]
+              fracOpMuts = ["/"]
 
 instance Mutable (Pat a) where
   mutate (PVar l n)              = m1 (PVar l) n
@@ -250,49 +256,71 @@ instance Mutable (Pat a) where
 
 
 instance Mutable (Exp a) where
-  mutate (App l e1 e2)                   = (App l (mInject l) (App l e1 e2)) : m2 (App l) e1 e2
-    where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
-  mutate (Var l qn)                      = m1 (Var l) qn
-  mutate (OverloadedLabel l str)         = []
-  mutate (IPVar l n)                     = m1 (IPVar l) n
-  mutate (Con l n)                       = m1 (Con l) n
-  mutate (Lit l literal)                 = m1 (Lit l) literal
-  mutate (InfixApp l e1 qOp e2)          = m3 (InfixApp l) e1 qOp e2
-  mutate (NegApp l e)                    = e : mutate e ++ m1 (NegApp l) e
-  mutate (Lambda l p e)                  = m2 (Lambda l) p e
-  mutate (Let l b e)                     = m2 (Let l) b e
-  mutate (If l ifExp thenExp elseExp)    = m3 (If l) ifExp thenExp elseExp
-  mutate (MultiIf l g)                   = m1 (MultiIf l) g
-  mutate (Case l e a)                    = m2 (Case l) e a
-  mutate (Do l s)                        = m1 (Do l) s -- The last statement in the list should be an expression.
-  mutate (MDo l s)                       = m1 (MDo l) s
-  mutate (Tuple l b e)                   = m2 (Tuple l) b e
-  mutate (UnboxedSum l i1 i2 e)          = [] -- m3 (UnboxedSum l) i1 i2 e
-  mutate (TupleSection l b e)            = m2 (TupleSection l) b e
-  mutate (List l e)                      = m1 (List l) e
-  mutate (ParArray l e)                  = m1 (ParArray l) e
-  mutate (Paren l e)                     = m1 (Paren l) e
-  mutate (LeftSection l o e)             = m2 (LeftSection l) o e
-  mutate (RightSection l e o)            = m2 (RightSection l) e o
-  mutate (RecConstr l n u)               = [] -- m2 (RecConstr l) n u
-  mutate (RecUpdate l e u)               = [] -- m2 (RecUpdate l) e u
-  mutate (EnumFrom l e)                  = List l [e] : m1 (EnumFrom l) e
-  mutate (EnumFromTo l e1 e2)            = m2 (EnumFromTo l) e1 e2
-  mutate (EnumFromThen l e1 e2)          = m2 (EnumFromThen l) e1 e2
-  mutate (EnumFromThenTo l e1 e2 e3)     = m3 (EnumFromThenTo l) e1 e2 e3
-  mutate (ParArrayFromTo l e1 e2)        = m2 (ParArrayFromTo l) e1 e2
-  mutate (ParArrayFromThenTo l e1 e2 e3) = m3 (ParArrayFromThenTo l) e1 e2 e3
-  mutate (ListComp l e q)                = [] -- m2 (ListComp l) e q
-  mutate (ParComp l e q)                 = [] -- m2 (ParComp l) e q
-  mutate (ParArrayComp l e q)            = [] -- m2 (ParArrayComp l) e q
-  mutate (ExpTypeSig l e t)              = [e] -- e : m2 (ExpTypeSig l) e t
-  mutate (Proc l p e)                    = m2 (Proc l) p e
-  mutate (LeftArrApp l e1 e2)            = m2 (LeftArrApp l) e1 e2
-  mutate (RightArrApp l e1 e2)           = m2 (RightArrApp l) e1 e2
-  mutate (LeftArrHighApp l e1 e2)        = m2 (LeftArrHighApp l) e1 e2
-  mutate (RightArrHighApp l e1 e2)       = m2 (RightArrHighApp l) e1 e2
-  mutate _                               = []
+    mutate exp = case exp of
 
+        Var l qn                      -> App l (mInject l) exp : m1 (Var l) qn
+        Con l n                       -> m1 (Con l) n
+        Lit l literal                 -> m1 (Lit l) literal
+        InfixApp l e1 qOp e2          -> App l (mInject l) exp : m3 (InfixApp l) e1 qOp e2
+        App l e1 e2                   -> App l (mInject l) exp : m2 (App l) e1 e2
+        NegApp l e                    -> e : mutate e ++ m1 (NegApp l) e
+        Lambda l ps e                 -> m2 (Lambda l) ps e
+        Let l b e                     -> m2 (Let l) b e
+        If l ifE thenE elseE          -> If l ifE elseE thenE : m3 (If l) ifE thenE elseE
+        MultiIf l gs                  -> map (MultiIf l) (listMuts gs) ++ m1 (MultiIf l) gs
+        Case l e as                   -> map (Case l e) (listMuts as) ++ m2 (Case l) e as
+        Do l ss                       -> m1 (Do l) ss -- The last statement in the list should be an expression.
+        MDo l ss                      -> m1 (MDo l) ss
+        Tuple l b es                  -> m2 (Tuple l) b es
+        UnboxedSum l i1 i2 e          -> m3 (UnboxedSum l) i1 i2 e
+        TupleSection l b mbyExp       -> m2 (TupleSection l) b mbyExp
+        List l es                     -> map (List l) (listMuts es) ++ m1 (List l) es
+        ParArray l es                 -> map (ParArray l) (listMuts es) ++ m1 (ParArray l) es
+        Paren l e                     -> m1 (Paren l) e
+        LeftSection l o e             -> m2 (LeftSection l) o e
+        RightSection l e o            -> m2 (RightSection l) e o
+        RecConstr l n fus             -> m2 (RecConstr l) n fus
+        RecUpdate l e fus             -> m2 (RecUpdate l) e fus
+        -- What other mutations can we perform on Enum...?
+        EnumFrom l e                  -> List l [e] : m1 (EnumFrom l) e
+        EnumFromTo l e1 e2            -> EnumFromTo l e2 e1 : m2 (EnumFromTo l) e1 e2
+        EnumFromThen l e1 e2          -> EnumFromThen l e2 e1 : m2 (EnumFromThen l) e1 e2
+        EnumFromThenTo l e1 e2 e3     -> EnumFromThenTo l e3 e2 e1 : m3 (EnumFromThenTo l) e1 e2 e3
+        ParArrayFromTo l e1 e2        -> ParArrayFromTo l e2 e1 : m2 (ParArrayFromTo l) e1 e2
+        ParArrayFromThenTo l e1 e2 e3 -> ParArrayFromThenTo l e3 e2 e1 : m3 (ParArrayFromThenTo l) e1 e2 e3
+        ListComp l e qs               -> m2 (ListComp l) e qs
+        ParComp l e qss               -> m2 (ParComp l) e qss
+        ParArrayComp l e qss          -> m2 (ParArrayComp l) e qss
+        ExpTypeSig l e t              -> e : map (\x -> ExpTypeSig l x t) (mutate e)
+        Proc l p e                    -> m2 (Proc l) p e
+        LeftArrApp l e1 e2            -> LeftArrApp l e2 e1 : m2 (LeftArrApp l) e1 e2
+        RightArrApp l e1 e2           -> RightArrApp l e2 e1 : m2 (RightArrApp l) e1 e2
+        LeftArrHighApp l e1 e2        -> LeftArrHighApp l e2 e1 : m2 (LeftArrHighApp l) e1 e2
+        RightArrHighApp l e1 e2       -> RightArrHighApp l e2 e1 : m2 (RightArrHighApp l) e1 e2
+        LCase l as                    -> map (LCase l) (listMuts as) ++ m1 (LCase l) as
+
+        _ -> []
+
+        where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
+              -- TODO: Add more cases for how to shuffle lists. These appear
+              --       in expressions with guards, cases (alts), and lists.
+              -- Do we need different lists for cases/guards vs. regular lists?
+              listMuts xs = [reverse xs, last xs : init xs, tail xs, init xs,
+                             [head xs]]
+
+instance Mutable (QualStmt a) where
+    mutate qualStmt = case qualStmt of
+        QualStmt l stmt      -> m1 (QualStmt l) stmt
+        ThenTrans l e        -> m1 (ThenTrans l) e
+        ThenBy l e1 e2       -> m2 (ThenBy l) e1 e2
+        GroupBy l e          -> m1 (GroupBy l) e
+        GroupUsing l e       -> m1 (GroupUsing l) e
+        GroupByUsing l e1 e2 -> m2 (GroupByUsing l) e1 e2
+
+instance Mutable (FieldUpdate a) where
+    mutate fieldUpdate = case fieldUpdate of
+        FieldUpdate l qName exp -> m2 (FieldUpdate l) qName exp
+        _ -> []
 
 instance Mutable (IPName a) where
   mutate _ = []
@@ -313,8 +341,8 @@ instance Mutable (QName a) where
     mutate _               = []
 
 instance Mutable (Literal a) where
-    mutate (Int l int _)  = mapLit (Int l) int (intMuts int)
-      where intMuts n = filter (/= n) [0, 1, n+1, n-1, n*(-1)]
+    mutate (Int l i s) = mapStrings $ map (\x -> Int l x s) intMuts
+        where intMuts = mutate i
 
     mutate (Frac l rat _) = mapLit (Frac l) rat (ratMuts rat)
       where ratMuts r = filter (/= r) [0, 1, r+1, r-1, r*(-1), r/2, r*2, r/10, r*10,
@@ -327,19 +355,27 @@ instance Mutable (Literal a) where
     mutate (Char l char _) = mapLit (Char l) char (charMuts char)
       where constChars = ['x', 'a', '%', '\0', '\n']
             charMuts c = filter (/= c) $ (case c of
-                                           minBound -> [succ c]
-                                           maxBound -> [pred c]
+                                           '\NUL'     -> [succ c]
+                                           '\1114111' -> [pred c]
                                            _ -> [succ c, pred c]
                                          ) ++ constChars
 
     mutate (String l str _) = mapLit (String l) str (strMuts str)
-      where strMuts xs = filter (/= xs) ["", ' ':xs, tail xs, reverse xs, init xs, xs ++ " "]
+      where strMuts xs = filter (/= xs) ["", ' ':xs, tail xs, reverse xs, 
+                                         init xs, xs ++ " "]
 
     -- TODO: Unboxed literals(?)
 
     mutate _ = []
 -- Helper function for mutate on Literals
 mapLit constr param xs = map (\x -> constr x (show x)) xs
+
+mapStrings :: [Literal a] -> [Literal a]
+mapStrings [] = []
+mapStrings (Int l i s : xs) = Int l i (show i) : mapStrings xs
+
+instance Mutable Integer where
+    mutate n = [n + 1, n - 1, -n, 0, 1, (fromIntegral n) :: Integer]    
 
 {- Borde nog inte muteras
 -}
