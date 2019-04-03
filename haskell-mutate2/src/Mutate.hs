@@ -205,10 +205,12 @@ instance Mutable (Rhs a) where
 instance Mutable (GuardedRhs a) where
     mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
 
-{- TODO
--}
 instance Mutable (Stmt a) where
-    mutate _ = []
+    mutate stmt = case stmt of
+        Generator l pat exp -> m2 (Generator l) pat exp
+        Qualifier l exp     -> m1 (Qualifier l) exp
+        LetStmt l binds     -> m1 (LetStmt l) binds
+        RecStmt l stmts     -> m1 (RecStmt l) stmts
 
 instance Mutable (Binds a) where
     mutate binds = case binds of
