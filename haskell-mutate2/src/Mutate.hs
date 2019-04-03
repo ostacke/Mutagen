@@ -252,23 +252,24 @@ instance Mutable (Pat a) where
 
 instance Mutable (Exp a) where
     mutate exp = case exp of
-        App l e1 e2                   -> App l (mInject l) exp : m2 (App l) e1 e2
-        InfixApp l e1 qOp e2          -> App l (mInject l) exp : m3 (InfixApp l) e1 qOp e2
-        Var l qn                      -> m1 (Var l) qn
+
+        Var l qn                      -> App l (mInject l) exp : m1 (Var l) qn
         OverloadedLabel l str         -> []
-        IPVar l n                     -> m1 (IPVar l) n
+        IPVar l n                     -> []
         Con l n                       -> m1 (Con l) n
         Lit l literal                 -> m1 (Lit l) literal
+        InfixApp l e1 qOp e2          -> App l (mInject l) exp : m3 (InfixApp l) e1 qOp e2
+        App l e1 e2                   -> App l (mInject l) exp : m2 (App l) e1 e2
         NegApp l e                    -> e : mutate e ++ m1 (NegApp l) e
         Lambda l ps e                 -> m2 (Lambda l) ps e
         Let l b e                     -> m2 (Let l) b e
-        If l ifExp thenExp elseExp    -> m3 (If l) ifExp thenExp elseExp
-        MultiIf l gs                  -> m1 (MultiIf l) gs
-        Case l e as                   -> m2 (Case l) e as
+        If l ifE thenE elseE          -> If l ifE elseE thenE : m3 (If l) ifE thenE elseE
+        MultiIf l gs                  -> map (MultiIf l) (guardMuts gs) ++ m1 (MultiIf l) gs
+        Case l e as                   -> map (Case l e) (caseMuts as) ++ m2 (Case l) e as
         Do l ss                       -> m1 (Do l) ss -- The last statement in the list should be an expression.
         MDo l ss                      -> m1 (MDo l) ss
         Tuple l b es                  -> m2 (Tuple l) b es
-        UnboxedSum l i1 i2 e          -> [] -- m3 (UnboxedSum l) i1 i2 e
+        UnboxedSum l i1 i2 e          -> m3 (UnboxedSum l) i1 i2 e
         TupleSection l b es           -> m2 (TupleSection l) b es
         List l es                     -> m1 (List l) es
         ParArray l es                 -> m1 (ParArray l) es
@@ -296,6 +297,10 @@ instance Mutable (Exp a) where
         _ -> []
 
         where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
+              -- TODO: Add more cases for how to shuffle guards and cases
+              guardMuts gs = [reverse gs, last gs : init gs]
+              caseMuts as = [reverse as, last as : init as]
+
         
         
 instance Mutable (IPName a) where
@@ -317,8 +322,8 @@ instance Mutable (QName a) where
     mutate _               = []
 
 instance Mutable (Literal a) where
-    mutate (Int l int _)  = mapLit (Int l) int (intMuts int)
-      where intMuts n = filter (/= n) [0, 1, n+1, n-1, n*(-1)]
+    mutate (Int l i s) = mapStrings $ map (\x -> Int l x s) intMuts
+        where intMuts = mutate i
 
     mutate (Frac l rat _) = mapLit (Frac l) rat (ratMuts rat)
       where ratMuts r = filter (/= r) [0, 1, r+1, r-1, r*(-1), r/2, r*2, r/10, r*10,
@@ -337,13 +342,21 @@ instance Mutable (Literal a) where
                                          ) ++ constChars
 
     mutate (String l str _) = mapLit (String l) str (strMuts str)
-      where strMuts xs = filter (/= xs) ["", ' ':xs, tail xs, reverse xs, init xs, xs ++ " "]
+      where strMuts xs = filter (/= xs) ["", ' ':xs, tail xs, reverse xs, 
+                                         init xs, xs ++ " "]
 
     -- TODO: Unboxed literals(?)
 
     mutate _ = []
 -- Helper function for mutate on Literals
 mapLit constr param xs = map (\x -> constr x (show x)) xs
+
+mapStrings :: [Literal a] -> [Literal a]
+mapStrings [] = []
+mapStrings (Int l i s : xs) = Int l i (show i) : mapStrings xs
+
+instance Mutable Integer where
+    mutate n = [n + 1, n - 1, -n, 0, 1, (fromIntegral n) :: Integer]    
 
 {- Borde nog inte muteras
 -}
