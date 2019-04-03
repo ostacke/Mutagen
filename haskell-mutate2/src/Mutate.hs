@@ -284,13 +284,14 @@ instance Mutable (Exp a) where
         RecConstr l n fus             -> m2 (RecConstr l) n fus
         RecUpdate l e fus             -> m2 (RecUpdate l) e fus
         
+        -- What other mutations can we perform on Enum...?
         EnumFrom l e                  -> List l [e] : m1 (EnumFrom l) e
-        EnumFromTo l e1 e2            -> m2 (EnumFromTo l) e1 e2
-        EnumFromThen l e1 e2          -> m2 (EnumFromThen l) e1 e2
-        EnumFromThenTo l e1 e2 e3     -> m3 (EnumFromThenTo l) e1 e2 e3
-        ParArrayFromTo l e1 e2        -> m2 (ParArrayFromTo l) e1 e2
-        ParArrayFromThenTo l e1 e2 e3 -> m3 (ParArrayFromThenTo l) e1 e2 e3
-        ListComp l e qs               -> [] -- m2 (ListComp l) e q
+        EnumFromTo l e1 e2            -> EnumFromTo l e2 e1 : m2 (EnumFromTo l) e1 e2
+        EnumFromThen l e1 e2          -> EnumFromThen l e2 e1 : m2 (EnumFromThen l) e1 e2
+        EnumFromThenTo l e1 e2 e3     -> EnumFromThenTo l e3 e2 e1 : m3 (EnumFromThenTo l) e1 e2 e3
+        ParArrayFromTo l e1 e2        -> ParArrayFromTo l e2 e1 : m2 (ParArrayFromTo l) e1 e2
+        ParArrayFromThenTo l e1 e2 e3 -> ParArrayFromThenTo l e3 e2 e1 : m3 (ParArrayFromThenTo l) e1 e2 e3
+        ListComp l e qs               -> m2 (ListComp l) e qs
         ParComp l e qss               -> [] -- m2 (ParComp l) e q
         ParArrayComp l e qss          -> [] -- m2 (ParArrayComp l) e q
         ExpTypeSig l e t              -> [e] -- e : m2 (ExpTypeSig l) e t
@@ -309,6 +310,15 @@ instance Mutable (Exp a) where
               caseMuts as = [reverse as, last as : init as]
               listMuts xs = [reverse xs, last xs : init xs, tail xs, init xs,
                              [head xs]]
+
+instance Mutable (QualStmt a) where
+    mutate qualStmt = case qualStmt of
+        QualStmt l stmt      -> m1 (QualStmt l) stmt
+        ThenTrans l e        -> m1 (ThenTrans l) e
+        ThenBy l e1 e2       -> m2 (ThenBy l) e1 e2
+        GroupBy l e          -> m1 (GroupBy l) e
+        GroupUsing l e       -> m1 (GroupUsing l) e
+        GroupByUsing l e1 e2 -> m2 (GroupByUsing l) e1 e2
 
 instance Mutable (FieldUpdate a) where
     mutate fieldUpdate = case fieldUpdate of
