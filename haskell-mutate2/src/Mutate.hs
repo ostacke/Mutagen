@@ -211,9 +211,12 @@ instance Mutable (Stmt a) where
     mutate _ = []
 
 instance Mutable (Binds a) where
-    mutate (BDecls l decls) = m1 (BDecls l) decls
-    mutate _ = []
-    -- TODO: mutate (IPBinds l ipbinds) = m1 (BDecls l) ipbinds
+    mutate binds = case binds of
+        BDecls l decls    -> m1 (BDecls l) decls
+        IPBinds l ipbinds -> m1 (IPBinds l) ipbinds
+
+instance Mutable (IPBind a) where
+    mutate (IPBind l ipName exp) = map (IPBind l ipName) (mutate exp)
 
 instance Mutable (Match a) where
     mutate match = case match of
