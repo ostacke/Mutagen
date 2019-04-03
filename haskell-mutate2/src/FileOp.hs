@@ -1,17 +1,47 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module FileOp
-    ( wipeDirIfExists
-    , backupOriginal
-    , restoreOriginal
-    , copyMutateInject
+    ( backupOriginal
+    , cabalAddModule
     , cleanMutateInject
+    , copyMutateInject
+    , restoreOriginal
+    , wipeDirIfExists
     ) where
 
-import Data.FileEmbed
 import Data.ByteString as BS (writeFile)
+import Data.FileEmbed
+import Data.Char
 import System.Directory
 import System.FilePath
+import System.IO
+
+
+-- | Adds module to the target .cabal file's "other-modules" field
+--   to suppress warnings.
+cabalAddModule :: String   -- ^ Name of module to insert
+               -> FilePath -- ^ Path to .cabal file
+               -> IO ()
+cabalAddModule m p = do
+    contents <- readFile p
+    let newContent = unlines $ cabalAddModule' "library" m $ lines contents
+    Prelude.writeFile tmp newContent
+    removeFile p
+    renameFile tmp p
+    where tmp = p ++ ".tmp"
+
+cabalAddModule' _ _ [] = error "Couldn't find field to insert module."
+cabalAddModule' target m (x:xs)
+    | isTarget x = x : cabalAddModule'' "other-modules:" m xs
+    | otherwise  = x : cabalAddModule' target m xs
+    where isTarget x = take (length target) (dropWhile isSpace x) == target
+
+cabalAddModule'' _ _ [] = error "Couldn't find field to insert module."
+cabalAddModule'' target m (x:xs)
+    | isTarget x = x : toInsert : xs
+    | otherwise  = x : cabalAddModule'' target m xs
+    where isTarget x  = take (length target) (dropWhile isSpace x) == target
+          toInsert = "      " ++ m -- To match indentation of existing stuff
 
 
 -- | Writes the MutateInject.hs file to the target project's src folder.

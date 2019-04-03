@@ -45,7 +45,9 @@ showUsage = do
 
 launchAtProject :: FilePath -> IO ()
 launchAtProject projectPath = do
-    -- Check if there already exists a "MutateInject.hs"
+    -- Check if there already exists a "MutateInject.hs", since we do not 
+    -- want to overwrite the existing file in the off-chance that it isn't
+    -- our injected file.
     checkInjectExists
 
     -- Build and run the unmodified test suites to see that they work when 
@@ -55,14 +57,21 @@ launchAtProject projectPath = do
     -- Clean old output folder
     wipeDirIfExists outputDir
     
-    -- Get absolute file paths to all files in the source folder.
+    -- Get absolute file paths to all files in the source folder, these are 
+    -- the files that will be mutated.
     -- NOTE: This needs to run BEFORE injecting MutateInject.hs
     srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
 
-    -- Copy MutateInject.hs to project directory
+    -- Copy MutateInject.hs to project directory, so that the mutated source 
+    -- files have access to the required module
     -- NOTE: This needs to happen AFTER getting the source file paths, 
     --       otherwise the program tries to mutate our injected file.
     srcDirFromProject projectPath >>= copyMutateInject
+
+    -- Add "MutateInject" to "other-modules" of the project .cabal file, 
+    -- after backing up.
+    cabalPathFromProject projectPath >>= \x -> backupOriginal x backupDir
+    cabalPathFromProject projectPath >>= \x -> cabalAddModule "MutateInject" x
 
     -- Mutate and test all source files in turn, generating a 
     -- result summary, then sums the results. Also saves surviving 
@@ -70,8 +79,10 @@ launchAtProject projectPath = do
     rs <- mapM (flip runRoutine projectPath) srcFiles
     let resultSummary = foldl (|+|) emptyRes rs
 
-    -- Remove the injected MutateInject.hs file.
+    -- Remove the injected MutateInject.hs file and restore the original 
+    -- .cabal file.
     srcDirFromProject projectPath >>= cleanMutateInject
+    cabalPathFromProject projectPath >>= \x -> restoreOriginal backupDir x
 
     printResults resultSummary
     

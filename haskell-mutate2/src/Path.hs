@@ -3,10 +3,11 @@
 -- look to the FileOp module for such functions.
 
 module Path 
-    ( srcDirFromProject
-    , testSuitesFromProject
-    , getAbsoluteDirContents
+    ( cabalPathFromProject
     , filePathsFromDir
+    , getAbsoluteDirContents
+    , srcDirFromProject
+    , testSuitesFromProject
     ) where
 
 import Control.Monad
