@@ -232,7 +232,7 @@ instance Mutable (Name a) where
 
         where eqMuts = ["==", "/="]
               ordMuts = ["<", ">", "<=", ">="]
-              intOpMuts = ["+", "-", "*", "%"]
+              intOpMuts = ["+", "-", "*"]
               fracOpMuts = ["/"]
 
 instance Mutable (Pat a) where
