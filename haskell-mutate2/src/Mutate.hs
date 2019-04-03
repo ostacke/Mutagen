@@ -281,8 +281,9 @@ instance Mutable (Exp a) where
         Paren l e                     -> m1 (Paren l) e
         LeftSection l o e             -> m2 (LeftSection l) o e
         RightSection l e o            -> m2 (RightSection l) e o
-        RecConstr l n us              -> [] -- m2 (RecConstr l) n u
-        RecUpdate l e us              -> [] -- m2 (RecUpdate l) e u
+        RecConstr l n fus             -> m2 (RecConstr l) n fus
+        RecUpdate l e fus             -> m2 (RecUpdate l) e fus
+        
         EnumFrom l e                  -> List l [e] : m1 (EnumFrom l) e
         EnumFromTo l e1 e2            -> m2 (EnumFromTo l) e1 e2
         EnumFromThen l e1 e2          -> m2 (EnumFromThen l) e1 e2
@@ -308,6 +309,11 @@ instance Mutable (Exp a) where
               caseMuts as = [reverse as, last as : init as]
               listMuts xs = [reverse xs, last xs : init xs, tail xs, init xs,
                              [head xs]]
+
+instance Mutable (FieldUpdate a) where
+    mutate fieldUpdate = case fieldUpdate of
+        FieldUpdate l qName exp -> m2 (FieldUpdate l) qName exp
+        _ -> []
 
 instance Mutable (IPName a) where
   mutate _ = []
