@@ -77,10 +77,13 @@ launchAtProject projectPath = do
     
     where backupDir = projectPath </> backupSuffix
           outputDir = projectPath </> outputSuffix
-          checkInjectExists = do 
-              exists <- doesFileExist $ projectPath </> "MutateInject.hs"
-              when exists $ Prelude.error "MutateInject.hs already exists in \
-                                          \source directory! Aborting."
+          checkInjectExists = do
+              putStrLn "==> Looking for existing MutateInject.hs..."
+              srcDir <- srcDirFromProject projectPath
+              exists <- doesFileExist $ srcDir </> "MutateInject.hs"
+              if exists then Prelude.error "MutateInject.hs already exists in \
+                                           \source directory! Aborting."
+                        else putStrLn "None found, proceeding."
 
 
 checkTestSuites :: FilePath -> IO ()
