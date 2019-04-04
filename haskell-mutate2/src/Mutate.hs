@@ -305,8 +305,8 @@ instance Mutable (Exp a) where
               -- TODO: Add more cases for how to shuffle lists. These appear
               --       in expressions with guards, cases (alts), and lists.
               -- Do we need different lists for cases/guards vs. regular lists?
-              listMuts xs = [reverse xs, last xs : init xs, tail xs, init xs,
-                             [head xs]]
+              listMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs, 
+                             sInit xs, sHead xs]
 
 instance Mutable (QualStmt a) where
     mutate qualStmt = case qualStmt of
@@ -361,8 +361,8 @@ instance Mutable (Literal a) where
                                          ) ++ constChars
 
     mutate (String l str _) = mapLit (String l) str (strMuts str)
-      where strMuts xs = filter (/= xs) ["", ' ':xs, tail xs, reverse xs, 
-                                         init xs, xs ++ " "]
+      where strMuts xs = filter (/= xs) ["", ' ':xs, drop 1 xs, reverse xs, 
+                                         take (length xs - 1) xs, xs ++ " "]
 
     -- TODO: Unboxed literals(?)
 
@@ -390,4 +390,10 @@ instance (Mutable a) => Mutable [a] where
     mutate []     = []
     mutate (x:xs) = m2 (:) x xs
 
+-- Safe alternatives for operating on lists that could be empty.
+-- These always return lists as results, however.
+sHead = take 1
+sTail = drop 1
+sInit xs = take (length xs - 1) xs
+sLast xs = drop (length xs - 1) xs
 
