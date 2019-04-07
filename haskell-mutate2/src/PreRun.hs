@@ -1,15 +1,29 @@
 module PreRun where
 
+import System.Exit
 import System.Directory
+import System.Process
 
--- | Runs `cabal build` in the target directory.
-cabalBuild :: FilePath -> IO ExitCode
-cabalBuild path = return $
-    withCurrentDirectory path $ readProcessWithExitCode "cabal" ["build"] ""
+import Results
 
 
--- | Runs `cabal build` on a list of target modules.
-cabalBuildTargets :: FilePath -> [String] -> IO ExitCode
-cabalBuildTargets path targets = return $
-    withCurrentDirectory path $ 
-        readProcessWithExitCode "cabal" ("build" : targets) ""
+-- | Runs `cabal build` on a list of target modules inside a specified
+--   directory.
+cabalBuildTargets :: FilePath -> [String] -> IO (ExitCode, String, String)
+cabalBuildTargets path targets = withCurrentDirectory path $ 
+    readProcessWithExitCode "cabal" ("build" : targets) ""
+
+
+-- | Runs cabalBuild (optionally with targets) and presents the results.
+cabalBuildTargetsShow :: FilePath -> [String] -> IO (ExitCode, String, String)
+cabalBuildTargetsShow path targets = do
+    putStrLn "==> Building tests on the ORIGINAL code..."
+    res <- cabalBuildTargets path targets
+    case res of
+        (ExitSuccess, stdin, stderr) -> return res
+
+        (ExitFailure n, stdin, stderr) -> do
+            putStrLn $ "Error occurred when building tests for the original \
+                       \code (exit code " ++ show n ++ "):"
+            putStrLn stderr
+            return res
