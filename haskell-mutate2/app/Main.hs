@@ -1,16 +1,19 @@
 module Main where
 
+import Control.Monad
 import Data.Maybe (fromJust)
 import Language.Haskell.Exts
 import System.Environment
+import System.Exit
 import System.Directory
 import System.FilePath ((</>), (-<.>), takeFileName, takeExtension)
 import System.Process
 
 import FileOp
-import Results
 import Mutate
 import Path
+import PreRun
+import Results
 
 outputSuffix = "mutants-out"
 backupSuffix = "backups"
@@ -48,7 +51,8 @@ launchAtProject projectPath = do
 
     -- Build and run the unmodified test suites to see that they work when 
     -- unmodified.
-    checkTestSuites projectPath
+    cabalBuildTargetsShow projectPath []
+    putStrLn ""
 
     -- Clean old output folder
     wipeDirIfExists outputDir
@@ -85,47 +89,11 @@ launchAtProject projectPath = do
     where backupDir = projectPath </> backupSuffix
           outputDir = projectPath </> outputSuffix
           checkInjectExists = do
-              putStrLn "==> Looking for existing MutateInject.hs..."
+              putStrLn "==> Looking for conflicting MutateInject.hs..."
               srcDir <- srcDirFromProject projectPath
               exists <- doesFileExist $ srcDir </> "MutateInject.hs"
-              if exists then Prelude.error "MutateInject.hs already exists in \
-                                           \source directory! Aborting."
-                        else putStrLn "None found, proceeding."
-
-
-checkTestSuites :: FilePath -> IO ()
-checkTestSuites projectPath = do
-    putStrLn "==> Running tests on ORIGINAL code..."
-
-    testSuites <- testSuitesFromProject projectPath
-    setCurrentDirectory projectPath
-    results <- runTestSuites testSuites emptyRes
-
-    case results of
-        ResultSummary _ 0 0 -> putStrLn "No problems found."
-        ResultSummary _ k e -> do
-            putStrLn "==> WARNING:"
-            putStrLn $ "There were " ++ show k ++ " failed test(s) and "
-            putStrLn $ show e ++ " error(s) when testing the ORIGINAL code."
-            putStrLn ""
-
-
-runTestSuites :: [String] -> ResultSummary -> IO ResultSummary
-runTestSuites [] s = return s
-runTestSuites (x:xs) s = do
-    exitCode <- readProcessWithExitCode "cabal" ["test", x] ""
-    let res = getTestResult exitCode
-    let summary = updateSummary s res
-    case res of
-        Killed stdout -> do
-            putStrLn $ "WARNING: Test suite failed:\n"
-            putStrLn stdout
-            runTestSuites xs summary
-        Error stderr -> do
-            putStrLn $ "WARNING: There was an error when running testsuite:\n"
-            putStrLn stderr
-            runTestSuites xs summary
-        _ -> runTestSuites xs summary
+              when exists $ Prelude.error "MutateInject.hs already exists in \
+                                          \source directory! Aborting."
 
 
 -- | Given a path to a file, project, and a TestSummary, runs the process of 
@@ -133,7 +101,7 @@ runTestSuites (x:xs) s = do
 --   original file back. Then returns the updated TestSummary.
 runRoutine :: FilePath -> FilePath -> IO ResultSummary
 runRoutine filePath projectPath = do
-    putStrLn $ "Performing tests on mutant: " ++ takeFileName filePath
+    putStrLn $ "==> Performing tests on mutant: " ++ takeFileName filePath
 
     -- Back up the original file to the backup directory, creating the backup
     -- directory if not already existing.
@@ -154,6 +122,9 @@ runRoutine filePath projectPath = do
           outputDir = projectPath </> outputSuffix
 
 
+-- | Performs tests in a target directory with all generated mutants of a 
+--   specified source file. Then returns an updated ResultSummary from the 
+--   input summary.
 runTestsWithMutants :: FilePath             -- ^ Path to source file to mutate.
                     -> [Module SrcSpanInfo] -- ^ List of mutant ASTs.
                     -> FilePath             -- ^ Path to project directory.
@@ -164,19 +135,41 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
     -- Remove old file and write mutant to file.
     insertMutant
 
-    -- Run tests with a process, returning its results
-    putStrLn $ "Testing mutant... (" ++ show (length $ m:ms) ++ " left)" 
-    setCurrentDirectory projectPath
-    exitStatus <- readProcessWithExitCode "cabal" ["test"] ""
-    let testResult = getTestResult exitStatus
-    
-    -- Perform actions depending on the results
-    handleTestResult testResult m filePath (projectPath </> outputSuffix)
+    putStrLn $ "\n==> Building and testing mutant... (" 
+              ++ show (length $ m:ms) ++ " left)"
 
-    -- Update the summary values depending on the results
-    let newSum = updateSummary testSum testResult
+    -- Build the tests, returning its results, then runs the tests if building
+    -- was successful. If building failed, then the error count of the test 
+    -- summary is incremented. Depends on the test results otherwise.
 
-    runTestsWithMutants filePath ms projectPath newSum
+    -- The reason for first building the tests is to separate build errors 
+    -- from failed tests in the testing section (and possibly warnings)
+    res <- cabalBuildTargets projectPath 
+                =<< testSuitesFromProject projectPath
+    case res of
+        (ExitFailure n, _, stderr) -> do
+            putStrLn $ "Build failed with an ERROR \
+                       \(exit code " ++ show n ++ "):"
+            putStrLn stderr
+            let newSum = incError testSum
+
+            runTestsWithMutants filePath ms projectPath newSum
+
+        (ExitSuccess, _, _) -> do
+            putStrLn "Build succeeded."
+
+            -- Run tests with a process, returning its results
+            exitStatus <- withCurrentDirectory projectPath $
+                            readProcessWithExitCode "cabal" ["test"] ""
+            let testResult = getTestResult exitStatus
+            
+            -- Perform actions depending on the results
+            handleTestResult testResult m filePath (projectPath </> outputSuffix)
+
+            -- Update the summary values depending on the results
+            let newSum = updateSummary testSum testResult
+
+            runTestsWithMutants filePath ms projectPath newSum
 
     where insertMutant = do removeFile filePath
                             writeFile filePath (prettyPrint m)
@@ -209,19 +202,20 @@ handleTestResult res mutant mutantPath outDir = case res of
                         </> mutantName 
                        -<.> show mutantIndex ++ ".hs"
 
-        putStrLn "Testing succeeded; mutant SURVIVED.\n"
+        putStrLn "Tests succeeded; mutant SURVIVED.\n"
         putStrLn   "==> The mutant that was being tested was:"
         putStrLn $ "==> " ++ mutantPath
 
         -- Write surviving mutant to file
-        putStrLn "Saving copy of mutant..."
         writeFile newMutantPath $ prettyPrint mutant
         putStrLn $ "Copy of mutant saved to: " ++ newMutantPath
 
         -- For debugging, mostly:
+        {- 
         putStrLn "==> The mutant looked like:"
         putStrLn $ prettyPrint mutant
         putStrLn ""
+        -}
 
 
 -- | Attemps to parse a module at the given file path, returning the 
@@ -245,6 +239,7 @@ mutateFile path = do
                     putStrLn ""
                     return []
 
+
 -- | For debugging purposes. Performs mutations on a single file and 
 --  prettyPrints the results.
 launchOnFile :: FilePath -> IO ()
@@ -252,6 +247,7 @@ launchOnFile p = do
     ms <- mutateFile p
     mapM_ printMutantD ms
     putStrLn $ "Total number of mutants: " ++ show (length ms)
+
 
 printMutantD :: Module SrcSpanInfo -> IO ()
 printMutantD m = do
