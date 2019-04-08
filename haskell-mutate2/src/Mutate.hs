@@ -258,7 +258,7 @@ instance Mutable (Pat a) where
 instance Mutable (Exp a) where
     mutate exp = case exp of
 
-        Var l qn                      -> App l (mInject l) exp : m1 (Var l) qn
+        Var l qn                      -> (mInject l) exp : m1 (Var l) qn
         Con l n                       -> m1 (Con l) n
         Lit l literal                 -> m1 (Lit l) literal
         InfixApp l e1 qOp e2          -> App l (mInject l) exp : m3 (InfixApp l) e1 qOp e2
@@ -301,12 +301,26 @@ instance Mutable (Exp a) where
 
         _ -> []
 
-        where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
+        where mInject l = App l (App l (Var l ( UnQual l ( Ident l "mutateInj" ))) (genSeed l))
               -- TODO: Add more cases for how to shuffle lists. These appear
               --       in expressions with guards, cases (alts), and lists.
               -- Do we need different lists for cases/guards vs. regular lists?
               listMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs, 
                              sInit xs, sHead xs]
+
+genSeed :: SrcSpanInfo -> Int
+genSeed SrcSpanInfo { srcInfoSpan = s , srcInfoPoints = xs } = genSeed' (s:xs)
+
+genSeed' :: [SrcSpan] -> Int
+genSeed' [] = 0
+genSeed' (SrcSpan { srcSpanFilename    = fn
+                  , srcSpanStartLine   = a
+                  , srcSpanStartColumn = b
+                  , srcSpanEndLine     = c
+                  , srcSpanEndColumn   = d
+                  } : xs) = length fn * a * b * c * d 
+                          + length fn + a + b + c + d + genSeed' xs
+                  -- (Use some kind of pseudo-random generating calculations)
 
 instance Mutable (QualStmt a) where
     mutate qualStmt = case qualStmt of
