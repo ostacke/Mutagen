@@ -44,8 +44,8 @@ instance Injectable Char where
         where mutants = constChars ++ charMuts c
               constChars = ['x', 'a', '%', '\0', '\n']
               charMuts c = filter (/= c) $ case c of
-                                            minBound -> [succ c]
-                                            maxBound -> [pred c]
+                                            '\NUL'     -> [succ c]
+                                            '\1114111' -> [pred c]
                                             _ -> [succ c, pred c]
 
 instance Injectable (Maybe a) where
@@ -53,14 +53,6 @@ instance Injectable (Maybe a) where
         where mutants = case m of
                             Just a -> [Nothing]
         
-
-{- TODO: How to do (a, a)?
-instance Injectable (a, a) where
-    mutateInj (x, y) = pickOne mutants
-        where mutants = [(y, x)]
--}                  
-
--- TODO
 pickOne :: Int -> [a] -> a
 pickOne n xs = xs !! ((9999 * n) `mod` length xs)
 
