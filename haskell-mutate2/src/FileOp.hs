@@ -82,7 +82,7 @@ backupOriginal originalFile backupDir = do
     putStrLn $ "To:   " ++ backupFilePath
     withCurrentDirectory backupDir $ copyFile originalFile backupFilePath
     putStrLn $ "Backup created successfully."
-    putStrLn ""
+    putStrLn $ ""
 
 restoreOriginal :: FilePath -> FilePath -> IO ()
 restoreOriginal backupDir originalFile = do
@@ -92,4 +92,4 @@ restoreOriginal backupDir originalFile = do
     putStrLn $ "To:   " ++ show originalFile
     copyFile backupFile originalFile
     putStrLn $ "Successfully restored original file."
-    putStrLn ""
+    putStrLn $ ""
