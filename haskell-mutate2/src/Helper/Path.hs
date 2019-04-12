@@ -2,7 +2,7 @@
 -- Functions in this module should not modify anything in the filesystem,
 -- look to the FileOp module for such functions.
 
-module Path 
+module Helper.Path 
     ( cabalPathFromProject
     , filePathsFromDir
     , getAbsoluteDirContents

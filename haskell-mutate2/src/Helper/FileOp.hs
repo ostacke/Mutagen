@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module FileOp
+module Helper.FileOp
     ( backupOriginal
     , cabalAddModule
     , cleanMutateInject
@@ -12,10 +12,10 @@ module FileOp
 import Data.ByteString as BS (writeFile)
 import Data.FileEmbed
 import Data.Char
+import qualified Path.Internal as P
 import System.Directory
 import System.FilePath
 import System.IO
-
 
 -- | Adds module to the target .cabal file's "other-modules" field
 --   to suppress warnings.
