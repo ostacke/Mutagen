@@ -213,15 +213,18 @@ runTestsWithMutants filePath to (m:ms) projectPath testSum = do
             putStrLn "Build succeeded."
 
             -- Run tests with a process, returning its results
-            exitStatus <- withCurrentDirectory projectPath $
+            mbyExitStatus <- timeout to $
+                            withCurrentDirectory projectPath $
                             readProcessWithExitCode "cabal" ["test"] ""
-            let testResult = getTestResult exitStatus
-            
+
+            let testResult = case mbyExitStatus of
+                                Nothing -> Error "Timed out."
+                                Just es -> getTestResult es
+
+            let newSum = updateSummary testSum testResult
+
             -- Perform actions depending on the results
             handleTestResult testResult m filePath (projectPath </> outputSuffix)
-
-            -- Update the summary values depending on the results
-            let newSum = updateSummary testSum testResult
 
             runTestsWithMutants filePath to ms projectPath newSum
 
