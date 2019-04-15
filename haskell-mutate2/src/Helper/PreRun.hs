@@ -1,10 +1,10 @@
-module PreRun where
+module Helper.PreRun where
 
 import System.Exit
 import System.Directory
 import System.Process
 
-import Results
+import Helper.Results
 
 
 -- | Runs `cabal build` on a list of target modules inside a specified
