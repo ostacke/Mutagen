@@ -12,13 +12,15 @@ import System.Directory
 import System.FilePath ((</>), (-<.>), takeFileName, takeExtension)
 import System.Posix.Signals
 import System.Process
-
+import System.Timeout
 
 import Helper.FileOp
 import Helper.Path
 import Helper.PreRun
 import Helper.Results
 import Mutate
+
+type Timeout = Int
 
 outputSuffix = "mutants-out"
 backupSuffix = "backups"
@@ -30,9 +32,20 @@ main = do
     
     case args of
         "--help"       : _  -> showUsage
-        "--project-dir": xs -> makeAbsolute (head xs) >>= launchAtProject
+        "--project-dir": xs -> 
+            makeAbsolute (head xs) >>= \x -> launchAtProject timeout x
+
+            where timeout = case getTimeout args of
+                                Just n  -> (read n :: Timeout) * 1000  -- convert to milliseconds
+                                Nothing -> 10000
+                
         "--file"       : xs -> makeAbsolute (head xs) >>= launchOnFile
         _ -> showUsage
+
+getTimeout :: [String] -> Maybe String
+getTimeout [] = Nothing
+getTimeout (x:xs) | x == "--timeout" = Just (head xs)
+                  | otherwise = getTimeout xs
 
 
 -- | Clean up and restore backups if program is interrupted.
@@ -66,12 +79,15 @@ showUsage = do
     putStrLn "--project-dir DIRECTORY   Specifies directory of cabal project."
     putStrLn "                          Should contain a .cabal file and "
     putStrLn "                          defaults to ./ if not specified"
+    putStrLn "--timeout NUMBER          Specifies the maximum time in ms to run"
+    putStrLn "                          each test before timing out. Defaults to"
+    putStrLn "                          10 000 (10 seconds)."
     putStrLn "--file FILE               (For debugging) Mutates a file and prints"
     putStrLn "                                          the mutations."
 
 
-launchAtProject :: FilePath -> IO ()
-launchAtProject projectPath = do
+launchAtProject :: Timeout -> FilePath -> IO ()
+launchAtProject to projectPath = do
     tid <- myThreadId
     installHandler keyboardSignal (Catch (interrupt tid projectPath)) Nothing
 
@@ -113,7 +129,7 @@ launchAtProject projectPath = do
     -- Mutate and test all source files in turn, generating a 
     -- result summary, then sums the results. Also saves surviving 
     -- mutants to file.
-    rs <- mapM (flip runRoutine projectPath) srcFiles
+    rs <- mapM (\x -> runRoutine to x projectPath) srcFiles
     let resultSummary = foldl (|+|) emptyRes rs
 
     -- Remove the injected MutateInject.hs file and restore the original 
@@ -136,8 +152,8 @@ launchAtProject projectPath = do
 -- | Given a path to a file, project, and a TestSummary, runs the process of 
 --   backing up the original file, mutating it, testing it, and restoring the 
 --   original file back. Then returns the updated TestSummary.
-runRoutine :: FilePath -> FilePath -> IO ResultSummary
-runRoutine filePath projectPath = do
+runRoutine :: Timeout -> FilePath -> FilePath -> IO ResultSummary
+runRoutine to filePath projectPath = do
     putStrLn $ "==> Performing tests on mutant: " ++ takeFileName filePath
 
     -- Back up the original file to the backup directory, creating the backup
@@ -148,7 +164,7 @@ runRoutine filePath projectPath = do
     mutantModules <- mutateFile filePath
 
     -- Run the tests with the mutant, return the results from the test
-    testSummary <- runTestsWithMutants filePath mutantModules projectPath emptyRes
+    testSummary <- runTestsWithMutants filePath to mutantModules projectPath emptyRes
 
     -- Restore the original file from the backup location
     restoreOriginal backupDir filePath
@@ -163,12 +179,13 @@ runRoutine filePath projectPath = do
 --   specified source file. Then returns an updated ResultSummary from the 
 --   input summary.
 runTestsWithMutants :: FilePath             -- ^ Path to source file to mutate.
+                    -> Timeout              -- ^ Time that each test has before timing out
                     -> [Module SrcSpanInfo] -- ^ List of mutant ASTs.
                     -> FilePath             -- ^ Path to project directory.
                     -> ResultSummary
                     -> IO ResultSummary     -- ^ Result summary of test runs.
-runTestsWithMutants _ [] _ testSum = return testSum
-runTestsWithMutants filePath (m:ms) projectPath testSum = do
+runTestsWithMutants _ _ [] _ testSum = return testSum
+runTestsWithMutants filePath to (m:ms) projectPath testSum = do
     -- Remove old file and write mutant to file.
     insertMutant
 
@@ -190,7 +207,7 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
             putStrLn stderr
             let newSum = incError testSum
 
-            runTestsWithMutants filePath ms projectPath newSum
+            runTestsWithMutants filePath to ms projectPath newSum
 
         (ExitSuccess, _, _) -> do
             putStrLn "Build succeeded."
@@ -206,7 +223,7 @@ runTestsWithMutants filePath (m:ms) projectPath testSum = do
             -- Update the summary values depending on the results
             let newSum = updateSummary testSum testResult
 
-            runTestsWithMutants filePath ms projectPath newSum
+            runTestsWithMutants filePath to ms projectPath newSum
 
     where insertMutant = do removeFile filePath
                             writeFile filePath (prettyPrint m)
