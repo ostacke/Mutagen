@@ -1,35 +1,63 @@
 module Main where
 
+import Control.Concurrent
 import Control.Monad
 import Data.Maybe (fromJust)
 import Language.Haskell.Exts
+import Path.IO (copyDirRecur)
+import qualified Path.Internal as P
 import System.Environment
 import System.Exit
 import System.Directory
 import System.FilePath ((</>), (-<.>), takeFileName, takeExtension)
+import System.Posix.Signals
 import System.Process
 
-import FileOp
+
+import Helper.FileOp
+import Helper.Path
+import Helper.PreRun
+import Helper.Results
 import Mutate
-import Path
-import PreRun
-import Results
 
 outputSuffix = "mutants-out"
 backupSuffix = "backups"
 emptyRes = ResultSummary 0 0 0
 
-
 main :: IO ()
 main = do
     args <- getArgs
-
+    
     case args of
         "--help"       : _  -> showUsage
         "--project-dir": xs -> makeAbsolute (head xs) >>= launchAtProject
         "--file"       : xs -> makeAbsolute (head xs) >>= launchOnFile
         _ -> showUsage
 
+
+-- | Clean up and restore backups if program is interrupted.
+interrupt :: ThreadId   -- ^ ThreadId to interrupt
+          -> FilePath   -- ^ Project directory path
+          -> IO ()
+interrupt tid projDir = do
+    srcDir <- srcDirFromProject projDir
+
+    threadDelay 1000
+
+    putStrLn "Interrupted, restoring files..."
+
+    -- Remove MutateInject.hs and restore original cabal file.
+    cleanMutateInject srcDir
+    cabalPathFromProject projDir >>= \x -> restoreOriginal backupDir x
+
+    -- Restore source files
+    let srcBackup = P.Path (backupDir </> (takeFileName srcDir))
+    let origLoc = P.Path (projDir </> (takeFileName srcDir))
+    copyDirRecur srcBackup origLoc
+
+    killThread tid
+
+    where backupDir = projDir </> backupSuffix
 
 showUsage :: IO ()
 showUsage = do 
@@ -44,6 +72,13 @@ showUsage = do
 
 launchAtProject :: FilePath -> IO ()
 launchAtProject projectPath = do
+    tid <- myThreadId
+    installHandler keyboardSignal (Catch (interrupt tid projectPath)) Nothing
+
+    -- Make backup of original source files
+    srcDir <- srcDirFromProject projectPath
+    copyDirRecur (P.Path srcDir) (P.Path $ backupDir </> (takeFileName srcDir))
+
     -- Check if there already exists a "MutateInject.hs", since we do not 
     -- want to overwrite the existing file in the off-chance that it isn't
     -- our injected file.

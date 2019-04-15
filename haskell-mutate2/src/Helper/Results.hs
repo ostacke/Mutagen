@@ -1,4 +1,4 @@
-module Results where
+module Helper.Results where
 
 import System.Exit
 
