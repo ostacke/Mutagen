@@ -33,14 +33,15 @@ injectMutateInject m = case m of
                                 , importAs = Nothing
                                 , importSpecs = Nothing } 
 
-m1 :: (Mutable a) => (a -> b) -> a -> [b]
+m1 :: Mutable a => (a -> b) -> a -> [b]
 m1 f a = aMutants
     where aMutant = mutate a
           aMutants = map (\x -> f x) aMutant
 
 -- | Returns the list of mutants created by applying mutate on types
 --   with two type parameters (excluding location l)
-m2 :: (Mutable a, Mutable b) => (a -> b -> c) -> a -> b -> [c]
+m2 :: (Mutable a, Mutable b) => 
+    (a -> b -> c) -> a -> b -> [c]
 m2 f a b = aMutants ++ bMutants
     where aMutant = mutate a
           bMutant = mutate b
@@ -86,7 +87,7 @@ m5 f a b c d e = aMutants ++ bMutants ++ cMutants ++ dMutants ++ eMutants
           dMutants = map (\x -> f a b c x e) dMutant
           eMutants = map (\x -> f a b c d x) eMutant
 
-instance (Show a) => Mutable (Module a) where
+instance (Show a, SrcInfo a) => Mutable (Module a) where
     mutate mod = case mod of
         Module l (Just moduleHead) pragmas importDecls decls -> 
             mod : m3 (Module l (Just moduleHead)) pragmas importDecls decls
@@ -98,26 +99,26 @@ instance (Show a) => Mutable (Module a) where
 {-  ModuleHead includes the name and export information. Should
     probably remain unmutated.
 -}
-instance Mutable (ModuleHead a) where
+instance SrcInfo a => Mutable (ModuleHead a) where
     mutate rest = []
 
 {-  ModulePragma contains messages to the compiler. Should probably
     remain unmutated.
 -}
-instance Mutable (ModulePragma a) where
+instance SrcInfo a => Mutable (ModulePragma a) where
     mutate rest = []
 
 {-  ImportDecl contains import declarations. Should probably remain
     unmutated.
 -}
-instance Mutable (ImportDecl a) where
+instance SrcInfo a => Mutable (ImportDecl a) where
   mutate rest = []
 
 {-  Decl is the top level of all the declarations and functions
     in a Haskell file.
     Mutated: Operator fixity, function binding clauses and pattern bindings
 -}
-instance Mutable (Decl a) where
+instance SrcInfo a => Mutable (Decl a) where
     mutate decl = case decl of
         TypeDecl l declHead typ -> []
         TypeFamDecl l declHead resultSig injectivityInfo -> []
@@ -172,12 +173,12 @@ instance Mutable (Decl a) where
 
 {- Det här borde man kunna göra snyggare..
 -}
-instance Mutable (Assoc a) where
+instance SrcInfo a => Mutable (Assoc a) where
     mutate (AssocNone l)  = [AssocNone l, AssocLeft l, AssocRight l]
     mutate (AssocLeft l)  = [AssocNone l, AssocLeft l, AssocRight l]
     mutate (AssocRight l) = [AssocNone l, AssocLeft l, AssocRight l]
 
-instance Mutable (Op a) where
+instance SrcInfo a => Mutable (Op a) where
     mutate _ = []
 
 instance Mutable Int where
@@ -185,47 +186,47 @@ instance Mutable Int where
 
 {- Borde inte muteras
 -}
-instance Mutable (Overlap a) where
+instance SrcInfo a => Mutable (Overlap a) where
     mutate _ = []
 
 {- Borde inte muteras
 -}
-instance Mutable (InstRule a) where
+instance SrcInfo a => Mutable (InstRule a) where
     mutate _ = []
 
-instance Mutable (InstDecl a) where
+instance SrcInfo a => Mutable (InstDecl a) where
     mutate instDecl = case instDecl of    
         InsDecl l decl -> m1 (InsDecl l) decl
         _ -> []
 
-instance Mutable (Rhs a) where
+instance SrcInfo a => Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
     mutate (GuardedRhss l guardedRhss) = m1 (GuardedRhss l) guardedRhss
 
-instance Mutable (GuardedRhs a) where
+instance SrcInfo a => Mutable (GuardedRhs a) where
     mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
 
-instance Mutable (Stmt a) where
+instance SrcInfo a => Mutable (Stmt a) where
     mutate stmt = case stmt of
         Generator l pat exp -> m2 (Generator l) pat exp
         Qualifier l exp     -> m1 (Qualifier l) exp
         LetStmt l binds     -> m1 (LetStmt l) binds
         RecStmt l stmts     -> m1 (RecStmt l) stmts
 
-instance Mutable (Binds a) where
+instance SrcInfo a => Mutable (Binds a) where
     mutate binds = case binds of
         BDecls l decls    -> m1 (BDecls l) decls
         IPBinds l ipbinds -> m1 (IPBinds l) ipbinds
 
-instance Mutable (IPBind a) where
+instance SrcInfo a => Mutable (IPBind a) where
     mutate (IPBind l ipName exp) = map (IPBind l ipName) (mutate exp)
 
-instance Mutable (Match a) where
+instance SrcInfo a => Mutable (Match a) where
     mutate match = case match of
         Match l name pat rhs mbyBinds -> m4 (Match l) name pat rhs mbyBinds
         _ -> []
 
-instance Mutable (Name a) where
+instance SrcInfo a => Mutable (Name a) where
     mutate name = case name of
         Symbol l s -> map (Symbol l) $ eqMuts ++ ordMuts ++ intOpMuts ++ fracOpMuts
         _ -> []
@@ -235,7 +236,7 @@ instance Mutable (Name a) where
               intOpMuts = ["+", "-", "*"]
               fracOpMuts = ["/"]
 
-instance Mutable (Pat a) where
+instance SrcInfo a => Mutable (Pat a) where
   mutate (PVar l n)              = m1 (PVar l) n
   mutate (PLit l s li)           = [] -- m2 (PLit l) s li
   mutate (PNPlusK l n i)         = [] -- m2 (PNPlusK l) n i
@@ -255,14 +256,14 @@ instance Mutable (Pat a) where
   mutate (PBangPat l p)          = m1 (PBangPat l) p
 
 
-instance Mutable (Exp a) where
+instance SrcInfo a => Mutable (Exp a) where
     mutate exp = case exp of
 
-        Var l qn                      -> App l (mInject l) exp : m1 (Var l) qn
+        Var l qn                      -> mInject l exp : m1 (Var l) qn
         Con l n                       -> m1 (Con l) n
         Lit l literal                 -> m1 (Lit l) literal
-        InfixApp l e1 qOp e2          -> App l (mInject l) exp : m3 (InfixApp l) e1 qOp e2
-        App l e1 e2                   -> App l (mInject l) exp : m2 (App l) e1 e2
+        InfixApp l e1 qOp e2          -> mInject l exp : m3 (InfixApp l) e1 qOp e2
+        App l e1 e2                   -> mInject l exp : m2 (App l) e1 e2
         NegApp l e                    -> e : mutate e ++ m1 (NegApp l) e
         Lambda l ps e                 -> m2 (Lambda l) ps e
         Let l b e                     -> m2 (Let l) b e
@@ -301,14 +302,23 @@ instance Mutable (Exp a) where
 
         _ -> []
 
-        where mInject l = Var l ( UnQual l ( Ident l "mutateInj" ))
+        where mInject l = App l (
+                              App l (
+                                  (Var l (UnQual l (Ident l "mutateInj" ))))
+                                  (Lit l (Int l (genSeed l) (show (genSeed l)))))
               -- TODO: Add more cases for how to shuffle lists. These appear
               --       in expressions with guards, cases (alts), and lists.
               -- Do we need different lists for cases/guards vs. regular lists?
-              listMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs, 
+              listMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs,
                              sInit xs, sHead xs]
 
-instance Mutable (QualStmt a) where
+genSeed :: SrcInfo a => a -> Integer
+genSeed l = toInteger $ length fn * sl * sc + length fn * sl * sc
+    where sl = startLine l
+          sc = startColumn l
+          fn = fileName l
+
+instance SrcInfo a => Mutable (QualStmt a) where
     mutate qualStmt = case qualStmt of
         QualStmt l stmt      -> m1 (QualStmt l) stmt
         ThenTrans l e        -> m1 (ThenTrans l) e
@@ -317,30 +327,30 @@ instance Mutable (QualStmt a) where
         GroupUsing l e       -> m1 (GroupUsing l) e
         GroupByUsing l e1 e2 -> m2 (GroupByUsing l) e1 e2
 
-instance Mutable (FieldUpdate a) where
+instance SrcInfo a => Mutable (FieldUpdate a) where
     mutate fieldUpdate = case fieldUpdate of
         FieldUpdate l qName exp -> m2 (FieldUpdate l) qName exp
         _ -> []
 
-instance Mutable (IPName a) where
+instance SrcInfo a => Mutable (IPName a) where
   mutate _ = []
 
-instance Mutable (Alt a) where
+instance SrcInfo a => Mutable (Alt a) where
   mutate (Alt l pat rhs binds) = m3 (Alt l) pat rhs binds
 
 instance Mutable Boxed where
   mutate Boxed = [Unboxed]
   mutate Unboxed = [Boxed]
 
-instance Mutable (QOp a) where
+instance SrcInfo a => Mutable (QOp a) where
     mutate (QVarOp l qName) = m1 (QVarOp l) qName
     mutate _                = []
 
-instance Mutable (QName a) where
+instance SrcInfo a => Mutable (QName a) where
     mutate (UnQual l name) = m1 (UnQual l) name
     mutate _               = []
 
-instance Mutable (Literal a) where
+instance SrcInfo a => Mutable (Literal a) where
     mutate (Int l i s) = mapStrings $ map (\x -> Int l x s) intMuts
         where intMuts = mutate i
 
@@ -379,14 +389,14 @@ instance Mutable Integer where
 
 {- Borde nog inte muteras
 -}
-instance Mutable (PatternSynDirection a) where
+instance SrcInfo a => Mutable (PatternSynDirection a) where
     mutate _ = []
 
-instance (Mutable a) => Mutable (Maybe a) where
+instance Mutable a => Mutable (Maybe a) where
     mutate (Just a) = Nothing : m1 Just a
     mutate _        = []
 
-instance (Mutable a) => Mutable [a] where
+instance Mutable a => Mutable [a] where
     mutate []     = []
     mutate (x:xs) = m2 (:) x xs
 
