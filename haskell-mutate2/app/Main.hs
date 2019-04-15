@@ -60,7 +60,9 @@ launchAtProject projectPath = do
     -- Get absolute file paths to all files in the source folder, these are 
     -- the files that will be mutated.
     -- NOTE: This needs to run BEFORE injecting MutateInject.hs
-    srcFiles <- filePathsFromDir =<< srcDirFromProject projectPath
+    srcFiles <- srcDirFromProject projectPath
+                    >>= filePathsFromDir
+                    >>= filterM (\x -> pure $ takeExtension x == ".hs")
 
     -- Copy MutateInject.hs to project directory, so that the mutated source 
     -- files have access to the required module
