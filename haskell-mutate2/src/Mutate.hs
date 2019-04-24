@@ -144,7 +144,7 @@ instance SrcInfo a => Mutable (Decl a) where
             -> m1 (SpliceDecl l) exp
         TypeSig l name typ -> []
         PatSynSig l name tyVarBind1 context1 tyVarBind2 context2 typ -> []
-        FunBind l match -> m1 (FunBind l) match
+        FunBind l matches -> map (FunBind l) (listMuts matches) ++ m1 (FunBind l) matches
         PatBind l pat rhs binds
             -- -> m3 (PatBind l) pat rhs mbyBinds
             -> mutantsA ++ mutantsB ++ mutantsC
@@ -170,6 +170,9 @@ instance SrcInfo a => Mutable (Decl a) where
         RoleAnnotDecl l qName role -> []
         CompletePragma l name qName -> []
         -- _ -> []
+
+        where listMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs,
+                             sInit xs, sHead xs]
 
 {- Det här borde man kunna göra snyggare..
 -}
@@ -201,7 +204,10 @@ instance SrcInfo a => Mutable (InstDecl a) where
 
 instance SrcInfo a => Mutable (Rhs a) where
     mutate (UnGuardedRhs l exp) = m1 (UnGuardedRhs l) exp
-    mutate (GuardedRhss l guardedRhss) = m1 (GuardedRhss l) guardedRhss
+    mutate (GuardedRhss l guardedRhss) = map (GuardedRhss l) (listMuts guardedRhss)
+                                         ++ m1 (GuardedRhss l) guardedRhss
+        where listMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs,
+                             sInit xs, sHead xs]
 
 instance SrcInfo a => Mutable (GuardedRhs a) where
     mutate (GuardedRhs l stmts exp) = m2 (GuardedRhs l) stmts exp
@@ -223,8 +229,12 @@ instance SrcInfo a => Mutable (IPBind a) where
 
 instance SrcInfo a => Mutable (Match a) where
     mutate match = case match of
-        Match l name pat rhs mbyBinds -> m4 (Match l) name pat rhs mbyBinds
+        Match l name pat rhs mbyBinds -> map (\x -> Match l name x rhs mbyBinds) (listMuts pat)
+                                      ++ m4 (Match l) name pat rhs mbyBinds
         _ -> []
+
+        where listMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs,
+                             sInit xs, sHead xs]
 
 instance SrcInfo a => Mutable (Name a) where
     mutate name = case name of
