@@ -21,11 +21,17 @@ incError  (ResultSummary s f e) = ResultSummary s f (e + 1)
 printResults :: ResultSummary -> IO ()
 printResults (ResultSummary s k e) = do
     putStrLn ":: SUMMARY ::"
-    putStrLn $ "In total, " ++ show (s + k + e) ++ " mutants were created."
+    putStrLn $ "In total, " ++ show (s + k) ++ " valid mutants were created."
     putStrLn $ "Number of mutants killed: " ++ show k
     putStrLn $ "Number of mutants that survived: " ++ show s
-    putStrLn $ "Number of errors: " ++ show e
-
+    putStrLn $ "Ratio of killed mutants / created mutants: " 
+        ++ show mutationScore 
+    putStrLn $ ""
+    putStrLn $ "Number of mutants that invoked errors: " ++ show e
+    putStrLn $ "Total number of mutants, including errors: " ++ show (s + k + e)
+        where mutationScore = if s + k == 0 
+                                then 0
+                                else fromIntegral k / (fromIntegral $ s + k)
 
 updateSummary :: ResultSummary -> TestResult -> ResultSummary
 updateSummary summary res = case res of
