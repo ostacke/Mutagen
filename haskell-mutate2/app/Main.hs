@@ -37,7 +37,7 @@ main = do
 
             where timeout = case getTimeout args of
                                 Just n  -> (read n :: Timeout) * 1000  -- convert to milliseconds
-                                Nothing -> 10000
+                                Nothing -> 10000000
                 
         "--file"       : xs -> makeAbsolute (head xs) >>= launchOnFile
         _ -> showUsage
@@ -53,6 +53,11 @@ interrupt :: ThreadId   -- ^ ThreadId to interrupt
           -> FilePath   -- ^ Project directory path
           -> IO ()
 interrupt tid projDir = do
+    -- Stop any running instances of the test suite
+    ts <- testSuitesFromProject projDir
+    mapM_ (\x -> spawnCommand $ "pkill " ++ x) ts
+
+    -- Prepare to restore stuff
     srcDir <- srcDirFromProject projDir
 
     threadDelay 1000
@@ -225,6 +230,10 @@ runTestsWithMutants filePath to (m:ms) projectPath testSum = do
 
             -- Perform actions depending on the results
             handleTestResult testResult m filePath (projectPath </> outputSuffix)
+
+            -- Kill the test suite, in case of infinte loops
+            ts <- testSuitesFromProject projectPath
+            mapM_ (\x -> spawnCommand $ "pkill " ++ x) ts
 
             runTestsWithMutants filePath to ms projectPath newSum
 
