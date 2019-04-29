@@ -238,13 +238,17 @@ instance SrcInfo a => Mutable (Match a) where
         where patMuts xs = [reverse xs, sLast xs ++ sInit xs, sTail xs ++ sHead xs]
 
 instance SrcInfo a => Mutable (Name a) where
-    mutate name = case name of
-        Symbol l s -> map (Symbol l) $ eqMuts ++ ordMuts ++ intOpMuts ++ fracOpMuts
-        _ -> []
+    mutate (Ident _ _) = []
+    mutate (Symbol l s)
+        | s `elem` eqMuts     = map (Symbol l) $ filter (/= s) eqMuts
+        | s `elem` ordMuts    = map (Symbol l) $ filter (/= s) $ eqMuts ++ ordMuts
+        | s `elem` numOpMuts  = map (Symbol l) $ filter (/= s) numOpMuts
+        | s `elem` fracOpMuts = map (Symbol l) $ filter (/= s) $ numOpMuts ++ fracOpMuts
+        | otherwise = []
 
-        where eqMuts = ["==", "/="]
-              ordMuts = ["<", ">", "<=", ">="]
-              intOpMuts = ["+", "-", "*"]
+        where eqMuts     = ["==", "/="]
+              ordMuts    = ["<", ">", "<=", ">="]
+              numOpMuts  = ["+", "-", "*"]
               fracOpMuts = ["/"]
 
 instance SrcInfo a => Mutable (Pat a) where
@@ -265,6 +269,7 @@ instance SrcInfo a => Mutable (Pat a) where
   mutate (PViewPat l e p)        = m2 (PViewPat l) e p
   mutate (PRPat l r)             = [] -- m1 (PRPat l) r
   mutate (PBangPat l p)          = m1 (PBangPat l) p
+  mutate _                       = []
 
 
 instance SrcInfo a => Mutable (Exp a) where
@@ -397,7 +402,7 @@ mapStrings [] = []
 mapStrings (Int l i s : xs) = Int l i (show i) : mapStrings xs
 
 instance Mutable Integer where
-    mutate n = [n + 1, n - 1, -n, 0, 1, (fromIntegral n) :: Integer]    
+    mutate n = filter (/= n) [n + 1, n - 1, -n, 0, 1, (fromIntegral n) :: Integer]
 
 {- Borde nog inte muteras
 -}
