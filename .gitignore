@@ -1,2 +1,3 @@
-stacke
-hs-test-project
+.stack-work/
+*~
+*-mutant
